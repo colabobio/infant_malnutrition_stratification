@@ -1,0 +1,50 @@
+---
+title: "Perm data analsys"
+output: html_document
+date: "2023-03-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ROCit)
+```
+
+```{r}
+base_model <- function(df) {
+  # Calculate the linear term in the logistic function of the model
+  # p(x) = 1 / (1+exp(-lp(x))
+  lp = with(df, 
+            -1.62 - 
+              0.34*maternal_height_4feet8inches_to_less_5feetinches + 
+              0.79*maternal_height_less_4feet8inches +
+            
+              ...
+              )
+  return(lp)
+}
+```
+
+```{r}
+data0 <- (...)
+```
+
+```{r}
+source('./mdl-evaluation.R')
+```
+
+```{r}
+pred0 <- unlist(map(1:nrow(data0), function(x) base_model(data0[x,]))) # prediction in log-odds (probabilities on logit scale)
+prob0 <- 1 / (1 + exp(-pred0))
+```
+
+```{r}
+# Generate the data frame with the data needed for the calibration and ROC plots
+plot_data0 <- data.frame(out = data0$out, logodds = pred0, prob = prob0)
+
+cal_plot(base_model, plot_data0, "prob", model_label = '', dir = mdl_folder0, fn = "cal_plot.pdf")
+cal_c0 <- cal_coeff(plot_data0, "prob", mdl_folder0, "cal_plot_coefficients.txt")
+print(cal_c0)
+
+roc_plot(data0$out, prob0, dir = mdl_folder0, fn = "roc_plot.pdf")
+```
