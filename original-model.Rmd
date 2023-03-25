@@ -4,11 +4,113 @@ output: html_document
 date: "2023-03-21"
 ---
 
+From Stata to R
+https://fsolt.org/blog/posts/switch-to-r/
+https://epi-stats.github.io/Rtutorials/Stata_to_R#recode
+https://www.techtips.surveydesign.com.au/post/the-recode-command
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-library(ROCit)
+# libraries needed
+library(tidyverse)  # most variable creation here uses tidyverse 
+library(tidyselect) # used to select variables in FP_EVENTS.R
+library(haven)      # used for Haven labeled DHSvariables
+library(labelled)   # used for Haven labeled variable creation
+library(expss)    # for creating tables with Haven labeled data
+library(xlsx)     # for exporting to excel
+library(naniar)   # to use replace_with_na function
+library(here)       # to get R project path
+library(sjlabelled) # to set variables label
+library(survey)  # to calculate weighted ratio for GAR
 ```
+
+```{r}
+# Household member data
+HMpath <- "risk-model/data/DHS-2019-21/household-member"
+HMdatafile <- "IAPR7EFL.DTA"
+HMdata <- read_dta(here(HMpath, HMdatafile))
+```
+
+```{r}
+# Children data
+Cpath <- "risk-model/data/DHS-2019-21/children"
+Cdatafile <- "IAKR7EFL.DTA"
+Cdata <- read_dta(here(Cpath, Cdatafile))
+```
+
+```{r}
+# Rename variables in children data to then merge with household
+Cdata <- Cdata %>% rename("hv000" = "v000")
+Cdata <- Cdata %>% rename("hv001" = "v001")
+Cdata <- Cdata %>% rename("hv002" = "v002")
+Cdata <- Cdata %>% rename("hvidx" = "b16")
+```
+
+```{r}
+Cdata
+```
+
+```{r}
+Mdata <- merge(HMdata, Cdata, by = c("hv000", "hv001", "hv002", "hvidx"), all.y = TRUE, all.x = TRUE)
+```
+
+```{r}
+# Sample weights in DHS datasets
+# Unit of analysis 				Variable 
+# Households 		 				  hv005 
+# Household members   		hv005 
+# Women or children 			v005 
+# Men 							      mv005 
+# Domestic Violence 			d005 
+# HIV test results 				hiv05 
+
+# Stata code
+#capture drop wgt
+#generate wgt = hv005/1000000 
+#gen wgt2 = 1
+#*svyset [pw=wgt], psu(hv001) strata(hv022) singleunit(scaled)
+#svyset hv001, weight(wgt) strata(hv022) , singleunit(centered) || _n, weight(wgt2) 
+
+# Set missing weigths to 1000000
+Mdata <- Mdata %>% mutate(hv005 = ifelse(is.na(hv005), 1000000, hv005))
+
+# weight data
+msvy <- svydesign(id = Mdata$hv001, strata=Mdata$hv022, weights = Mdata$hv005/1000000, data=Mdata)
+```
+
+
+
+```{r}
+# Identify eligible children
+
+# Stata code
+#capture drop eligch 
+#gen eligch = 0 
+#replace eligch = 1 if (hv103==1 & hc70 < 9996 & hc71 < 9996 & hc72 < 9996)
+
+Mdata <- Mdata %>% mutate(eligch = case_when(hv103 == 1 & hc70 < 996 & hc71 < 9996 & hc72 < 9996 ~ 1, TRUE ~ 0))
+```
+
+
+```{r}
+# Anthropometric variables 
+
+Mdata <- Mdata %>% rename("child_age" = "hc1")
+
+# Age group
+# State code
+#capture drop age_group 
+#recode child_age (0/5 = 0 "0. 0-5 mo")(6/11 = 1 "1. 6-11 mo")(12/17 = 2 "2. 12-17 mo") (18/24 = 3 "3. 18-24 mo")(25/59 = .),gen(age_group)
+#recode child_age (0/5 = 0 "0. 0-5 mo")(6/11 = 1 "1. 6-11 mo")(12/17 = 2 "2. 12-17 mo") (18/23 = 3 "3. 18-23 mo") (24/35 = 4 "4. 24-35 mo")(36/47 = 5 "5. 36-47 mo")(48/59 = 6 "6. 48-60 mo"),gen(age_group_5y)
+
+
+```
+
+
+
+
 
 ```{r}
 base_model <- function(df) {
