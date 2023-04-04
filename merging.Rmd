@@ -1,0 +1,87 @@
+---
+title: "Perm data merge"
+output: html_document
+date: "2023-03-21"
+---
+
+From Stata to R
+https://fsolt.org/blog/posts/switch-to-r/
+https://epi-stats.github.io/Rtutorials/Stata_to_R#recode
+https://www.techtips.surveydesign.com.au/post/the-recode-command
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# libraries needed
+library(tidyverse)  # most variable creation here uses tidyverse 
+library(tidyselect) # used to select variables in FP_EVENTS.R
+library(haven)      # used for Haven labeled DHSvariables
+library(labelled)   # used for Haven labeled variable creation
+library(expss)    # for creating tables with Haven labeled data
+library(xlsx)     # for exporting to excel
+library(naniar)   # to use replace_with_na function
+library(here)       # to get R project path
+library(sjlabelled) # to set variables label
+library(survey)  # to calculate weighted ratio for GAR
+```
+
+
+```{r}
+# Household member data
+HMpath <- "data/DHS-2019-21/household-member"
+HMdatafile <- "IAPR7EFL.DTA"
+HMdata <- read_dta(here(HMpath, HMdatafile))
+```
+
+```{r}
+HMdata
+```
+
+```{r}
+# Children data
+Cpath <- "data/DHS-2019-21/children"
+Cdatafile <- "IAKR7EFL.DTA"
+Cdata <- read_dta(here(Cpath, Cdatafile))
+```
+
+```{r}
+# Rename variables in children data to then merge with household
+Cdata <- Cdata %>% rename("hv000" = "v000")
+Cdata <- Cdata %>% rename("hv001" = "v001")
+Cdata <- Cdata %>% rename("hv002" = "v002")
+Cdata <- Cdata %>% rename("hvidx" = "b16")
+```
+
+```{r}
+Cdata
+```
+
+```{r}
+#capture drop _merge
+#gen b16 = hvidx
+#gen v000 = hv000
+#gen v001 = hv001
+#gen v002 = hv002
+#merge 1:1  v000 v001 v002 b16 using filename
+
+df <- merge(HMdata, Cdata, by = c("hv000", "hv001", "hv002", "hvidx"))
+```
+
+```{r}
+df
+```
+
+```{r}
+path <- "data/DHS-2019-21"
+datafile <- "merged.csv"
+write.csv(df, here(path, datafile), row.names=FALSE)
+```
+
+```{r}
+path <- "data/DHS-2019-21"
+datafile <- "merged.rda"
+save(df, file = here(path, datafile)) 
+```
+
+
