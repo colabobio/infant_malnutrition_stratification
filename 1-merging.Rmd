@@ -1,0 +1,78 @@
+---
+title: "Perm data merging"
+output: html_document
+date: "2023-03-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# libraries needed
+library(tidyverse)  # most variable creation here uses tidyverse 
+library(tidyselect) # used to select variables in FP_EVENTS.R
+library(haven)      # used for Haven labeled DHSvariables
+library(labelled)   # used for Haven labeled variable creation
+library(expss)    # for creating tables with Haven labeled data
+library(xlsx)     # for exporting to excel
+library(naniar)   # to use replace_with_na function
+library(here)       # to get R project path
+library(sjlabelled) # to set variables label
+library(survey)  # to calculate weighted ratio for GAR
+```
+
+```{r}
+# Household member df
+#HMpath <- "/Users/justi/OneDrive/Desktop/colabo_data/household_member/IAPR7EDT (3)/"
+HMpath <- "data/DHS-2019-21/household-member"
+HMdffile <- "IAPR7EFL.DTA"
+HMdf <- read_dta(here(HMpath, HMdffile))
+```
+
+```{r}
+HMdf 
+```
+
+```{r}
+# Children df
+#Cpath <- "/Users/justi/OneDrive/Desktop/colabo_data/children/IAKR7EDT (1)/"
+Cpath <- "data/DHS-2019-21/children"
+Cdffile <- "IAKR7EFL.DTA"
+Cdf <- read_dta(here(Cpath, Cdffile))
+```
+
+```{r}
+# Rename variables in children df to then merge with household
+Cdf <- Cdf %>% rename("hv000" = "v000")
+Cdf <- Cdf %>% rename("hv001" = "v001")
+Cdf <- Cdf %>% rename("hv002" = "v002")
+Cdf <- Cdf %>% rename("hvidx" = "b16")
+```
+
+```{r}
+#capture drop _merge
+#gen b16 = hvidx
+#gen v000 = hv000
+#gen v001 = hv001
+#gen v002 = hv002
+#merge 1:1  v000 v001 v002 b16 using filename
+
+df <- merge(HMdf, Cdf, by = c("hv000", "hv001", "hv002", "hvidx"))
+```
+
+```{r}
+df
+```
+
+```{r}
+#path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+path <- "data/DHS-2019-21"
+dffile <- "merged.csv"
+write.csv(df, here(path, dffile), row.names=FALSE)
+```
+
+```{r}
+path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+path <- "data/DHS-2019-21"
+dffile <- "merged.rda"
+save(df, file = here(path, dffile)) 
+```

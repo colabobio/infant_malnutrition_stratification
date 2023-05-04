@@ -1,5 +1,5 @@
 ---
-title: "Perm df merge"
+title: "Perm data recoding"
 output: html_document
 date: "2023-03-21"
 ---
@@ -29,60 +29,30 @@ library(tidyr)
 
 ```
 
-
 ```{r}
-# Household member df
-HMpath <- "/Users/justi/OneDrive/Desktop/colabo_data/household_member/IAPR7EDT (3)/"
-HMdffile <- "IAPR7EFL.DTA"
-HMdf <- read_dta(here(HMpath, HMdffile))
-```
-
-```{r}
-HMdf 
-```
-
-```{r}
-# Children df
-Cpath <- "/Users/justi/OneDrive/Desktop/colabo_data/children/IAKR7EDT (1)/"
-Cdffile <- "IAKR7EFL.DTA"
-Cdf <- read_dta(here(Cpath, Cdffile))
-```
-
-```{r}
-# Rename variables in children df to then merge with household
-Cdf <- Cdf %>% rename("hv000" = "v000")
-Cdf <- Cdf %>% rename("hv001" = "v001")
-Cdf <- Cdf %>% rename("hv002" = "v002")
-Cdf <- Cdf %>% rename("hvidx" = "b16")
-```
-
-
-```{r}
-#capture drop _merge
-#gen b16 = hvidx
-#gen v000 = hv000
-#gen v001 = hv001
-#gen v002 = hv002
-#merge 1:1  v000 v001 v002 b16 using filename
-
-df <- merge(HMdf, Cdf, by = c("hv000", "hv001", "hv002", "hvidx"))
+# path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+path <- "data/DHS-2019-21"
+datafile <- "merged.rda"
+load(here(path, datafile))
 ```
 
 ```{r}
 df
 ```
 
-```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-dffile <- "merged.csv"
-#write.csv(df, here(path, dffile), row.names=FALSE)
-```
+**** Some utilities
 
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-dffile <- "merged.rda"
-#save(df, file = here(path, dffile)) 
+# function to convert to factor with order of levels using case_when:
+# https://stackoverflow.com/questions/49572416/r-convert-to-factor-with-order-of-levels-same-with-case-when
+fct_case_when <- function(...) {
+  args <- as.list(match.call())
+  levels <- sapply(args[-1], function(f) f[[3]])  # extract RHS of formula
+  levels <- levels[!is.na(levels)]
+  factor(dplyr::case_when(...), levels=levels)
+}
 ```
+
 
 
 **** Add
@@ -107,7 +77,6 @@ if ("house_id" %in% names(df)) {
 
 # create `house_id` variable as a concatenation of `hv001` and `hv002`
 df$house_id <- as.numeric(paste0(df$hv001, df$hv002))
-
 ```
 
 capture drop wgt
@@ -506,18 +475,16 @@ recode maternal_height_cm (160/210 = 1 "1. 160+ cm") ///
 (145/149.999 = 4 "4. 145-149.9 cm") (80/144.999 = 5 "5. < 145 cm"), gen(maternal_height)
 
 ```{r}
-# Assuming your df is named 'df'
-# Remove the variable maternal_height if it exists
-if ("maternal_height" %in% colnames(df)) {
-  df$maternal_height <- NULL
-}
+# Remove variables starting with "maternal_height" if they exist
+df <- df %>%
+  select(-starts_with("maternal_height"))
 
 # Create a new variable maternal_height_cm and recode it into maternal_height
 df <- df %>%
   mutate(maternal_height_cm = v438 / 10) %>%
   replace_na(list(maternal_height_cm = NA)) %>%
   mutate(maternal_height_cm = ifelse(maternal_height_cm > 999, NA, maternal_height_cm)) %>%
-  mutate(maternal_height = case_when(
+  mutate(maternal_height = fct_case_when(
     maternal_height_cm >= 160 & maternal_height_cm <= 210   ~ "1. 160+ cm",
     maternal_height_cm >= 155 & maternal_height_cm < 160    ~ "2. 155-159.9 cm",
     maternal_height_cm >= 150 & maternal_height_cm < 155    ~ "3. 150-154.9 cm",
@@ -525,7 +492,6 @@ df <- df %>%
     maternal_height_cm >= 80  & maternal_height_cm < 145    ~ "5. < 145 cm",
     is.na(maternal_height_cm)                               ~ NA_character_
   ))
-
 ```
 
 capture drop maternal_bmi* 
@@ -535,7 +501,6 @@ recode maternal_bmi_value (0/18.49999 = 1 "1. < 18.5") (18.5/24.9999 = 2 "2. 18.
 (25/60 = 3 "3. 25+"), gen(maternal_bmi)
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove variables starting with "maternal_bmi" if they exist
 df <- df %>%
   select(-starts_with("maternal_bmi"))
@@ -545,15 +510,12 @@ df <- df %>%
   mutate(maternal_bmi_value = v445 / 100) %>%
   replace_na(list(maternal_bmi_value = NA)) %>%
   mutate(maternal_bmi_value = ifelse(maternal_bmi_value > 80, NA, maternal_bmi_value)) %>%
-  mutate(maternal_bmi = case_when(
+  mutate(maternal_bmi = fct_case_when(
     maternal_bmi_value >= 0   & maternal_bmi_value < 18.5  ~ "1. < 18.5",
     maternal_bmi_value >= 18.5 & maternal_bmi_value < 25    ~ "2. 18.5-24.9",
     maternal_bmi_value >= 25   & maternal_bmi_value <= 60   ~ "3. 25+",
     is.na(maternal_bmi_value)                               ~ NA_character_
   ))
-
-# Remove the temporary variable maternal_bmi_value
-df$maternal_bmi_value <- NULL
 ```
 
 capture drop paternal_height // variable is hb3
@@ -565,18 +527,16 @@ recode paternal_height_cm (160/230 = 1 "1. 160+ cm") ///
 qui bysort hhid (paternal_height): replace paternal_height = paternal_height[1]
 
 ```{r}
-# Assuming your df is named 'df'
-# Remove the variable paternal_height if it exists
-if ("paternal_height" %in% colnames(df)) {
-  df$paternal_height <- NULL
-}
+# Remove variables starting with "paternal_height" if they exist
+df <- df %>%
+  select(-starts_with("paternal_height"))
 
 # Create a new variable paternal_height_cm and recode it into paternal_height
 df <- df %>%
   mutate(paternal_height_cm = hb3 / 10) %>%
   replace_na(list(paternal_height_cm = NA)) %>%
   mutate(paternal_height_cm = ifelse(paternal_height_cm > 999, NA, paternal_height_cm)) %>%
-  mutate(paternal_height = case_when(
+  mutate(paternal_height = fct_case_when(
     paternal_height_cm >= 160 & paternal_height_cm <= 230   ~ "1. 160+ cm",
     paternal_height_cm >= 155 & paternal_height_cm < 160    ~ "2. 155-159.9 cm",
     paternal_height_cm >= 150 & paternal_height_cm < 155    ~ "3. 150-154.9 cm",
@@ -584,9 +544,6 @@ df <- df %>%
     paternal_height_cm >= 80  & paternal_height_cm < 145    ~ "5. < 145 cm",
     is.na(paternal_height_cm)                               ~ NA_character_
   ))
-
-# Remove the temporary variable paternal_height_cm
-df$paternal_height_cm <- NULL
 
 # Replace paternal_height with the first value of paternal_height within each hhid group
 df <- df %>%
@@ -603,18 +560,16 @@ recode paternal_bmi_value (0/18.49999 = 1 "1. < 18.5") (18.5/24.9999 = 2 "2. 18.
 qui bysort hhid (paternal_bmi): replace paternal_bmi = paternal_bmi[1]
 
 ```{r}
-# Assuming your df is named 'df'
-# Remove the variable paternal_bmi if it exists
-if ("paternal_bmi" %in% colnames(df)) {
-  df$paternal_bmi <- NULL
-}
+# Remove variables starting with "paternal_bmi" if they exist
+df <- df %>%
+  select(-starts_with("paternal_bmi"))
 
 # Create a new variable paternal_bmi_value and recode it into paternal_bmi
 df <- df %>%
   mutate(paternal_bmi_value = hb40 / 100) %>%
   replace_na(list(paternal_bmi_value = NA)) %>%
   mutate(paternal_bmi_value = ifelse(paternal_bmi_value > 80, NA, paternal_bmi_value)) %>%
-  mutate(paternal_bmi = case_when(
+  mutate(paternal_bmi = fct_case_when(
     paternal_bmi_value >= 0   & paternal_bmi_value < 18.5  ~ "1. < 18.5",
     paternal_bmi_value >= 18.5 & paternal_bmi_value < 25    ~ "2. 18.5-24.9",
     paternal_bmi_value >= 25   & paternal_bmi_value <= 60   ~ "3. 25+",
@@ -639,7 +594,6 @@ recode hv009 (2/4 = 1 "1. 4 or less")(5/8 = 2 "2. 5 to 8")(9/41  = 3 "3. 9 or mo
 *use the variable df for the df
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variables hhadults and hh_members if they exist
 if ("hhadults" %in% colnames(df)) {
   df$hhadults <- NULL
@@ -650,13 +604,13 @@ if ("hh_members" %in% colnames(df)) {
 
 # Create a new variable hhadults and hh_members based on recoded values
 df <- df %>%
-  mutate(hhadults = case_when(
+  mutate(hhadults = fct_case_when(
     hv217 >= 0 & hv217 <= 1 ~ "1. 1 or less adults",
     hv217 >= 2 & hv217 <= 3 ~ "2. 2 adults",
     hv217 == 4              ~ "3. 3+ adults",
     hv217 == 5              ~ NA_character_
   )) %>%
-  mutate(hh_members = case_when(
+  mutate(hh_members = fct_case_when(
     hv009 >= 2 & hv009 <= 4  ~ "1. 4 or less",
     hv009 >= 5 & hv009 <= 8  ~ "2. 5 to 8",
     hv009 >= 9 & hv009 <= 41 ~ "3. 9 or more"
@@ -678,7 +632,6 @@ recode v212 (0/17 = 0 "0. < 17 years")(18/45 = 1 "1. 18+")(46/. = .), gen(firstb
 
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variables m_age_marriage, marital_age, and firstbirth_18y if they exist
 if ("m_age_marriage" %in% colnames(df)) {
   df$m_age_marriage <- NULL
@@ -693,12 +646,12 @@ if ("firstbirth_18y" %in% colnames(df)) {
 # Create new variables marital_age and firstbirth_18y based on recoded values
 df <- df %>%
   mutate(m_age_marriage = v511) %>%
-  mutate(marital_age = case_when(
+  mutate(marital_age = fct_case_when(
+    m_age_marriage >= 18 & m_age_marriage <= 60 ~ "1. 18 or More",    
     m_age_marriage >= 0 & m_age_marriage < 18  ~ "2. < 18 Years",
-    m_age_marriage >= 18 & m_age_marriage <= 60 ~ "1. 18 or More",
     is.na(m_age_marriage)                       ~ NA_character_
   )) %>%
-  mutate(firstbirth_18y = case_when(
+  mutate(firstbirth_18y = fct_case_when(
     v212 >= 0  & v212 < 17  ~ "0. < 17 years",
     v212 >= 18 & v212 <= 45 ~ "1. 18+",
     v212 >= 46              ~ NA_character_
@@ -711,7 +664,6 @@ replace still_breastfed = 1 if m4 == 95
 replace still_breastfed = 0 if m4 != 95 & child_age <=60
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable still_breastfed if it exists
 if ("still_breastfed" %in% colnames(df)) {
   df$still_breastfed <- NULL
@@ -719,7 +671,7 @@ if ("still_breastfed" %in% colnames(df)) {
 
 # Create the new variable still_breastfed based on the given conditions
 df <- df %>%
-  mutate(still_breastfed = if_else(m4 == 95, 1, if_else(m4 != 95 & child_age <= 60, 0, NA_real_)))
+  mutate(still_breastfed = if_else(m4 == 95, 1, if_else(m4 != 95 & child_age <= 60, 0, NA_integer_)))
 ```
 
 capture drop icfi_breastmilk
@@ -729,7 +681,6 @@ replace icfi_breastmilk_score = 2 if still_breastfed == 1 & child_age >=6 & chil
 replace icfi_breastmilk_score = 1 if still_breastfed == 1 & child_age >12 & child_age <=60
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable icfi_breastmilk_score if it exists
 if ("icfi_breastmilk_score" %in% colnames(df)) {
   df$icfi_breastmilk_score <- NULL
@@ -737,11 +688,11 @@ if ("icfi_breastmilk_score" %in% colnames(df)) {
 
 # Create the new variable icfi_breastmilk_score based on the given conditions
 df <- df %>%
-  mutate(icfi_breastmilk_score = case_when(
+  mutate(icfi_breastmilk_score = fct_case_when(
     child_age >= 6 & child_age <= 60 ~ 0,
     still_breastfed == 1 & child_age >= 6 & child_age <= 12 ~ 2,
     still_breastfed == 1 & child_age > 12 & child_age <= 60 ~ 1,
-    TRUE ~ NA_real_
+    TRUE ~ NA_integer_
   ))
 ```
 
@@ -751,7 +702,6 @@ replace icfi_bottlefeed_score = 1 if  child_age >=6 & child_age <=60 & m38 == 0
 replace icfi_bottlefeed_score = 0 if  child_age >=6 & child_age <=60 & m38 == 1
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable icfi_bottlefeed_score if it exists
 if ("icfi_bottlefeed_score" %in% colnames(df)) {
   df$icfi_bottlefeed_score <- NULL
@@ -760,7 +710,7 @@ if ("icfi_bottlefeed_score" %in% colnames(df)) {
 # Create the new variable icfi_bottlefeed_score based on the given conditions
 df <- df %>%
   mutate(icfi_bottlefeed_score = if_else(child_age >= 6 & child_age <= 60 & m38 == 0, 1,
-                                         if_else(child_age >= 6 & child_age <= 60 & m38 == 1, 0, NA_real_)))
+                                         if_else(child_age >= 6 & child_age <= 60 & m38 == 1, 0, NA_integer_)))
 ```
 
 capture drop icfi_starchy_staples_score 
@@ -769,7 +719,6 @@ replace icfi_starchy_staples_score = 0 if child_age >=6 & child_age  <= 24
 replace icfi_starchy_staples_score = 1 if (v412a == 1 | v412b == 1 | v414e == 1 | v414f == 1 ) & child_age >=6 & child_age <=60 
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable icfi_starchy_staples_score if it exists
 if ("icfi_starchy_staples_score" %in% colnames(df)) {
   df$icfi_starchy_staples_score <- NULL
@@ -778,7 +727,7 @@ if ("icfi_starchy_staples_score" %in% colnames(df)) {
 # Create the new variable icfi_starchy_staples_score based on the given conditions
 df <- df %>%
   mutate(icfi_starchy_staples_score = if_else(child_age >= 6 & child_age <= 24, 0,
-                                              if_else((v412a == 1 | v412b == 1 | v414e == 1 | v414f == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+                                              if_else((v412a == 1 | v412b == 1 | v414e == 1 | v414f == 1) & child_age >= 6 & child_age <= 60, 1, NA_integer_)))
 ```
 
 capture drop icfi_lentils_score
@@ -787,7 +736,6 @@ replace icfi_lentils_score = 0 if child_age >=6 & child_age <=60
 replace icfi_lentils_score = 1 if v414o == 1  & child_age >=6 & child_age <=60 
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable icfi_lentils_score if it exists
 if ("icfi_lentils_score" %in% colnames(df)) {
   df$icfi_lentils_score <- NULL
@@ -796,7 +744,7 @@ if ("icfi_lentils_score" %in% colnames(df)) {
 # Create the new variable icfi_lentils_score based on the given conditions
 df <- df %>%
   mutate(icfi_lentils_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                      if_else(v414o == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+                                      if_else(v414o == 1 & child_age >= 6 & child_age <= 60, 1, NA_integer_)))
 ```
 
 
@@ -806,7 +754,6 @@ replace icfi_milk_score = 0 if child_age >=6 & child_age <=60
 replace icfi_milk_score = 1 if (v411 == 1 ) & child_age >=6 & child_age <=60 
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable icfi_milk_score if it exists
 if ("icfi_milk_score" %in% colnames(df)) {
   df$icfi_milk_score <- NULL
@@ -815,7 +762,7 @@ if ("icfi_milk_score" %in% colnames(df)) {
 # Create the new variable icfi_milk_score based on the given conditions
 df <- df %>%
   mutate(icfi_milk_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                   if_else(v411 == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+                                   if_else(v411 == 1 & child_age >= 6 & child_age <= 60, 1, NA_integer_)))
 ```
 
 capture drop icfi_dairy_score
@@ -824,7 +771,6 @@ replace icfi_dairy_score = 0 if child_age >=6 & child_age <=60
 replace icfi_dairy_score = 1 if ( v414p == 1 |v414q == 1) & child_age >=6 & child_age <=60 
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable icfi_dairy_score if it exists
 if ("icfi_dairy_score" %in% colnames(df)) {
   df$icfi_dairy_score <- NULL
@@ -833,7 +779,7 @@ if ("icfi_dairy_score" %in% colnames(df)) {
 # Create the new variable icfi_dairy_score based on the given conditions
 df <- df %>%
   mutate(icfi_dairy_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                    if_else((v414p == 1 | v414q == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+                                    if_else((v414p == 1 | v414q == 1) & child_age >= 6 & child_age <= 60, 1, NA_integer_)))
 ```
 
 
@@ -843,7 +789,6 @@ replace icfi_meat_score = 0 if child_age >=6 & child_age <=60
 replace icfi_meat_score = 1 if (v414a == 1 | v414m == 1) & child_age >=6 & child_age <=60 
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable icfi_meat_score if it exists
 if ("icfi_meat_score" %in% colnames(df)) {
   df$icfi_meat_score <- NULL
@@ -852,7 +797,7 @@ if ("icfi_meat_score" %in% colnames(df)) {
 # Create the new variable icfi_meat_score based on the given conditions
 df <- df %>%
   mutate(icfi_meat_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                   if_else((v414a == 1 | v414m == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+                                   if_else((v414a == 1 | v414m == 1) & child_age >= 6 & child_age <= 60, 1, NA_integer_)))
 ```
 
 capture drop icfi_eggs_fish_score
@@ -862,7 +807,6 @@ replace icfi_eggs_fish_score = 1 if (v414g == 1 | v414n == 1 ) & child_age >=6 &
 replace icfi_meat_score = 1 if icfi_eggs_fish_score == 1
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable icfi_eggs_fish_score if it exists
 if ("icfi_eggs_fish_score" %in% colnames(df)) {
   df$icfi_eggs_fish_score <- NULL
@@ -871,7 +815,7 @@ if ("icfi_eggs_fish_score" %in% colnames(df)) {
 # Create the new variable icfi_eggs_fish_score based on the given conditions
 df <- df %>%
   mutate(icfi_eggs_fish_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                        if_else((v414g == 1 | v414n == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_))) %>%
+                                        if_else((v414g == 1 | v414n == 1) & child_age >= 6 & child_age <= 60, 1, NA_integer_))) %>%
   mutate(icfi_meat_score = if_else(icfi_eggs_fish_score == 1, 1, icfi_meat_score))
 ```
 
@@ -881,7 +825,6 @@ replace icfi_vitA_score = 0 if child_age >=6 & child_age <=60
 replace icfi_vitA_score = 1 if (v414i == 1 | v414j == 1 | v414k == 1 ) & child_age >=6 & child_age <=60 
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable icfi_vitA_score if it exists
 if ("icfi_vitA_score" %in% colnames(df)) {
   df$icfi_vitA_score <- NULL
@@ -890,7 +833,7 @@ if ("icfi_vitA_score" %in% colnames(df)) {
 # Create the new variable icfi_vitA_score based on the given conditions
 df <- df %>%
   mutate(icfi_vitA_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                   if_else((v414i == 1 | v414j == 1 | v414k == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+                                   if_else((v414i == 1 | v414j == 1 | v414k == 1) & child_age >= 6 & child_age <= 60, 1, NA_integer_)))
 ```
 
 capture drop icfi_other_fruits_score
@@ -899,7 +842,6 @@ replace icfi_other_fruits_score = 0 if child_age >=6 & child_age <=60
 replace icfi_other_fruits_score = 1 if v414l == 1 & child_age >=6 & child_age <=60 
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable icfi_other_fruits_score if it exists
 if ("icfi_other_fruits_score" %in% colnames(df)) {
   df$icfi_other_fruits_score <- NULL
@@ -908,7 +850,7 @@ if ("icfi_other_fruits_score" %in% colnames(df)) {
 # Create the new variable icfi_other_fruits_score based on the given conditions
 df <- df %>%
   mutate(icfi_other_fruits_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                           if_else(v414l == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+                                           if_else(v414l == 1 & child_age >= 6 & child_age <= 60, 1, NA_integer_)))
 ```
 
 
@@ -922,7 +864,6 @@ recode dietary_diversity_score (0 = 1 "quintile 1") (1 = 2 "quintile 2") (2 = 3 
 (3/4 = 4 "quintile 4") (5/8 = 5 "quintile 5"), gen (dietary_diversity)
 
 ```{r}
-# Assuming your df is named 'df'
 # Remove the variable dietary_diversity_score and dietary_diversity if they exist
 if ("dietary_diversity_score" %in% colnames(df)) {
   df$dietary_diversity_score <- NULL
@@ -942,7 +883,7 @@ df <- df %>%
            dietary_diversity_score == 2 ~ 3,
            dietary_diversity_score >= 3 & dietary_diversity_score <= 4 ~ 4,
            dietary_diversity_score >= 5 & dietary_diversity_score <= 8 ~ 5,
-           is.na(dietary_diversity_score) ~ NA_real_
+           is.na(dietary_diversity_score) ~ NA_integer_
          ))
 
 # Set dietary_diversity_score to NA if all the other scores are NA
@@ -971,13 +912,11 @@ if ("bf_start" %in% colnames(df)) {
   df$bf_start <- NULL
 }
 
-
-# Assuming your df is named 'df'
 # Create the bf_start variable
 df <- df %>%
-  mutate(bf_start = case_when(v426 >= 0 & v426 <= 101 ~ "1. within first hour",
-                              v426 >= 102 & v426 <= 299 ~ "2. after 1hr",
-                              v426 == 99 | is.na(v426) ~ NA_character_))
+  mutate(bf_start = fct_case_when(v426 >= 0 & v426 <= 101 ~ "1. within first hour",
+                                  v426 >= 102 & v426 <= 299 ~ "2. after 1hr",
+                                  v426 == 99 | is.na(v426) ~ NA_character_))
 ```
 
 capture drop infectious_disease
@@ -986,17 +925,16 @@ replace infectious_disease = 0 if h11 == 0 & h31 == 0
 replace infectious_disease = 1 if h11 == 2 | h31 == 2
 
 ```{r}
-
 if ("infectious_disease" %in% colnames(df)) {
   df$infectious_disease <- NULL
 }
 
 df <- df %>%
   mutate(
-    infectious_disease = case_when(
+    infectious_disease = fct_case_when(
       h11 == 0 & h31 == 0 ~ 0,
       h11 == 2 | h31 == 2 ~ 1,
-      TRUE ~ NA_real_
+      TRUE ~ NA_integer_
     )
   )
 ```
@@ -1008,18 +946,16 @@ recode hv201 (11 12  = 1 "1. piped") ///
 
 ```{r}
 # Remove 'water_source' variable if it exists
-cols_to_remove <- grep("^water_source", colnames(df), value = TRUE)
-if (length(cols_to_remove) > 0) {
-  df <- df[, !(colnames(df) %in% cols_to_remove)]
+if ("water_source" %in% colnames(df)) {
+  df$infectious_disease <- NULL
 }
-
 # Recode the variable "hv201" and create a new variable called "water_source"
 df <- df %>% 
-  mutate(water_source = case_when(
-    hv201 %in% c(11, 12) ~ "1. piped",
+  mutate(water_source = fct_case_when(
     hv201 %in% c(13, 21, 41, 71, 31, 32, 42, 43, 51, 61, 62, 72) ~ "0. not piped",
+    hv201 %in% c(11, 12) ~ "1. piped",
     hv201 == 96 ~ NA_character_,
-    TRUE ~ as.character(hv201)
+    TRUE ~ NA_character_
   ))
 ```
 
@@ -1035,11 +971,11 @@ if ("water_treatment" %in% colnames(df)) {
 
 # Recode the variable "hv237" and create a new variable called "water_treatment"
 df <- df %>% 
-  mutate(water_treatment = case_when(
+  mutate(water_treatment = fct_case_when(
     hv237 == 0 ~ "0.no",
     hv237 == 1 ~ "1.yes",
     hv237 == 8 ~ NA_character_,
-    TRUE ~ as.character(hv237)
+    TRUE ~ NA_character_
   ))
 ```
 
@@ -1056,18 +992,12 @@ if ("toilet_type" %in% colnames(df)) {
 
 # Recode the variable "hv205" and create a new variable called "toilet_type"
 df <- df %>% 
-  mutate(toilet_type_char = case_when(
+  mutate(toilet_type = fct_case_when(
+    hv205 == 31 ~ "0. no toilet",    
     between(hv205, 11, 15) ~ "1. flush toilet",
     between(hv205, 21, 23) | between(hv205, 41, 96) ~ "2. pit or dry toilet",
-    hv205 == 31 ~ "0. no toilet",
-    TRUE ~ as.character(hv205)
-  )) %>% mutate(toilet_type = case_when(
-    toilet_type_char == "1. flush toilet"  ~ 1,
-     toilet_type_char == "2. pit or dry toilet" ~ 2,
-    toilet_type_char == "0. no toilet" ~ 0,
-    TRUE ~ as.numeric(hv205)
-  )) 
-  
+    TRUE ~ NA_character_
+  ))
 
 # Replace "toilet_type" with missing values if "child_age" is greater than 60
 df$toilet_type[df$child_age > 60] <- NA_character_
@@ -1080,10 +1010,10 @@ recode hv225 (0 = 0 "0. no") (1 = 1 "1. yes"), gen(toiletshare)
 ```{r}
 # Recode the variable "hv225" and create a new variable called "toiletshare"
 df <- df %>% 
-  mutate(toiletshare = case_when(
+  mutate(toiletshare = fct_case_when(
     hv225 == 0 ~ "0. no",
     hv225 == 1 ~ "1. yes",
-    TRUE ~ as.character(hv225)
+    TRUE ~ NA_character_
   ))
 ```
 
@@ -1104,7 +1034,7 @@ df <- df %>%
     between(hv226, 6, 8) ~ "2. wood/coal",
     between(hv226, 9, 11) ~ "3. straw/hay/dung",
     hv226 == 96 ~ NA_character_,
-    TRUE ~ as.character(hv226)
+    TRUE ~ NA_character_
   ))
 ```
 
@@ -1308,14 +1238,11 @@ if ("last_child_id" %in% colnames(df)) {
 
 # Drop the variable "last_child_id" (if it exists) and create a new variable called "last_child_id"
 df <- df %>% 
-  mutate(last_child_id = ifelse(midx == 1, real_id, NA_real_)) %>% 
-  select(-last_child_id) %>% 
-  mutate(last_child_id = ifelse(midx == 1, real_id, NA_real_)) 
+  mutate(last_child_id = ifelse(midx == 1, real_id, NA_integer_)) 
 
 # Sort the df by "mother_id" and "midx"
 df <- df %>% 
   arrange(mother_id, midx)
-
 ```
 
 capture drop state
