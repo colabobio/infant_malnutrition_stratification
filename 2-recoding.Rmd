@@ -2212,130 +2212,6 @@ df <- df %>% mutate(mother_agecat = case_when(
 ))
 ```
 
-order wgt real_id mother_id father_id bidx haz waz whz stunted wasted underweight ciaf  ///
-child_age age_group age_group_5y female ///
-maternal_height maternal_bmi marital_age firstbirth_18y preg_deworm preg_ironyn preg_iron delivery_place preg_deworm ///
-wealth_quintile hhadults rural state bpl_card caste religion ///
-total_living_children siblings sibling_under5 brothers_home sisters_home *birth_interval multiplet ///
-dietary_diversity_score bf_start vitamin_a child_anemia child_fever child_diarrhea birthweight child_deworm ///
-water_source water_treatment stool_disposal toilet_type toiletshare air_quality anganwadi_support season
-
-```{r}
-df0 <- data.frame(df, copy = TRUE)
-```
-
-```{r}
-df <- data.frame(df0, copy = TRUE)
-```
-
-```{r}
-# Removed missing variables: bpl_card
-
-# Reorder variables in the data frame
-df <- df %>% select(wgt, real_id, mother_id, father_id, bidx, haz, waz, whz, stunted, wasted, underweight, ciaf,
-                    child_age, age_group, age_group_5y, female, maternal_height, maternal_bmi, marital_age,
-                    firstbirth_18y, preg_deworm, preg_ironyn, preg_iron, delivery_place, preg_deworm,
-                    wealth_quintile, hhadults, rural, state, caste, religion,
-                    total_living_children, siblings, sibling_under5, brothers_home, sisters_home,
-                    pre_birth_interval, succeeding_birth_interval, multiplet, dietary_diversity_score, bf_start, vitamin_a,
-                    child_anemia, child_fever, child_diarrhea, birthweight, child_deworm, water_source,
-                    water_treatment, stool_disposal, toilet_type, toiletshare, air_quality,
-                    anganwadi_support, season)
-```
-
-global cat_child i.age_group i.female
-global child age_group female
-global predictors maternal_height firstbirth_18y preg_iron hhadults rural state bpl_card caste religion  siblings sibling_under5 ///
-brothers_home sisters_home pre_birth_interval water_treatment toilet_type  water_home floor_finish wall_finish roof_finish house_finish use_soap ///
-kitchen cooking_fuel reading
-global cat_predictors i.maternal_height i.firstbirth_18y i.preg_iron i.hhadults i.rural i.state_zones i.bpl_card i.caste i.religion ///
- i.siblings i.sibling_under5 i.brothers_home i.sisters_home i.pre_birth_interval i.water_treatment i.toilet_type ///
-i.water_home i.floor_finish i.wall_finish i.roof_finish i.house_finish i.use_soap i.kitchen i.cooking_fuel i.reading ///
-i.states i.dist_ciaf_decile 
-
-```{r}
-# Define categories for age_group and female variables
-cat_child <- c("0-5 months", "6-11 months", "12-23 months", "24-35 months", "36-47 months", "48-59 months")
-cat_age_group <- c("0-5 months", "6-11 months", "12-23 months", "24-35 months", "36-47 months", "48-59 months")
-
-# Define variables for predictors and categorical predictors
-predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state", "bpl_card", 
-                "caste", "religion", "siblings", "sibling_under5", "brothers_home", "sisters_home", 
-                "pre_birth_interval", "water_treatment", "toilet_type", "water_home", "floor_finish", 
-                "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", "cooking_fuel", 
-                "reading")
-cat_predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state_zones", 
-                    "bpl_card", "caste", "religion", "siblings", "sibling_under5", "brothers_home", 
-                    "sisters_home", "pre_birth_interval", "water_treatment", "toilet_type", "water_home", 
-                    "floor_finish", "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", 
-                    "cooking_fuel", "reading", "states", "dist_ciaf_decile")
-```
-
-global model_vars house_finish m_ht maternal_education toilet  cooking_fuel female christian low_caste
-global cat_model_vars ib(2).house_finish ib(1).m_ht ib(3).maternal_education ///
-ib(1).toilet i.state_zones  ib(1).cooking_fuel ib(1).female ib(1).christian i.low_caste
-
-```{r}
-# Define variable names
-model_vars <- c("house_finish", "m_ht", "maternal_education", "toilet", "cooking_fuel", "female", "christian", "low_caste")
-cat_model_vars <- c("as.factor(house_finish)", "as.factor(m_ht)", "as.factor(maternal_education)", "as.factor(toilet)", "as.factor(cooking_fuel)", "as.factor(female)", "as.factor(christian)", "as.factor(low_caste)")
-
-# Combine the variable names into a single string
-model_formula <- paste(cat_model_vars, collapse = " + ")
-```
-
-global model_vars house_finish m_ht maternal_education toilet  cooking_fuel female christian low_caste
-global cat_model_vars ib(2).house_finish ib(1).m_ht ib(3).maternal_education ///
-ib(1).toilet i.state_zones  ib(1).cooking_fuel ib(1).female ib(1).christian i.low_caste
-
-quietly logistic ciaf ib(2).house_finish ib(1).m_ht ib(3).maternal_education ///
-ib(1).toilet i.state_zones  ib(1).cooking_fuel ib(1).female  i.low_caste i.priority_state, coef
-quietly predict prob if e(sample)
-gen missing_covariates = 1 if prob == . 
-capture drop prob
-
-
-```{r}
-# Define category variables
-cat_child <- c("age_group", "female")
-
-# Define predictor variables
-child <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state", "bpl_card", "caste", "religion",
-           "siblings", "sibling_under5", "brothers_home", "sisters_home", "pre_birth_interval", "water_treatment", "toilet_type",
-           "water_home", "floor_finish", "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", "cooking_fuel",
-           "reading")
-
-# Define categorical predictor variables
-cat_predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state_zones", "bpl_card", "caste",
-                    "religion", "siblings", "sibling_under5", "brothers_home", "sisters_home", "pre_birth_interval",
-                    "water_treatment", "toilet_type", "water_home", "floor_finish", "wall_finish", "roof_finish",
-                    "house_finish", "use_soap", "kitchen", "cooking_fuel", "reading", "states", "dist_ciaf_decile")
-
-# Define model variables
-model_vars <- c("house_finish", "m_ht", "maternal_education", "toilet", "cooking_fuel", "female", "christian", "low_caste")
-
-# Define categorical model variables
-cat_model_vars <- list(ib2_house_finish = "house_finish", ib1_m_ht = "m_ht", ib3_maternal_education = "maternal_education",
-                       ib1_toilet = "toilet", i_state_zones = "state_zones", ib1_cooking_fuel = "cooking_fuel",
-                       ib1_female = "female", i_low_caste = "low_caste")
-
-# Select variables for logistic regression
-logistic_data <- df %>%
-  select(c("ciaf", model_vars, cat_model_vars, cat_child)) %>%
-  drop_na() # Drop rows with missing values
-
-# Fit logistic regression model
-logistic_model <- glm(ciaf ~ ., data = logistic_data, family = binomial(link = "logit"))
-
-# Predict probabilities
-logistic_data$prob <- predict(logistic_model, type = "response")
-
-# Create missing_covariates variable
-logistic_data$missing_covariates <- ifelse(is.na(logistic_data$prob), 1, 0)
-
-# Drop prob variable
-logistic_data <- logistic_data %>% select(-prob)
-```
 
 capture drop scale_ciaf1_house
 gen scale_ciaf1_house = .
@@ -2345,9 +2221,6 @@ replace scale_ciaf1_house = 4.5 if house_finish == 0
 
 
 ```{r}
-# Assuming your data is in a data frame named 'df'
-# Replace 'df' with the name of your data frame
-
 # Drop scale_ciaf1_house column if it exists
 if("scale_ciaf1_house" %in% names(df)) {
   df$scale_ciaf1_house <- NULL
@@ -2369,9 +2242,6 @@ replace scale_ciaf1_mheight = 4 if m_ht == 2
 replace scale_ciaf1_mheight = 8 if m_ht == 3
 
 ```{r}
-# Assuming your data is in a data frame named 'df'
-# Replace 'df' with the name of your data frame
-
 # Drop scale_ciaf1_mheight column if it exists
 if("scale_ciaf1_mheight" %in% names(df)) {
   df$scale_ciaf1_mheight <- NULL
@@ -2394,9 +2264,6 @@ replace scale_ciaf1_medu = 3.5 if maternal_education == 1
 replace scale_ciaf1_medu = 5 if maternal_education == 0 
 
 ```{r}
-# Assuming your data is in a data frame named 'df'
-# Replace 'df' with the name of your data frame
-
 # Drop scale_ciaf1_medu column if it exists
 if("scale_ciaf1_medu" %in% names(df)) {
   df$scale_ciaf1_medu <- NULL
@@ -2458,9 +2325,6 @@ gen scale_ciaf1_fuel = 0 if cooking_fuel == 1
 replace scale_ciaf1_fuel = 0.5 if cooking_fuel == 0 
 
 ```{r}
-# Assuming your data is in a data frame named 'df'
-# Replace 'df' with the name of your data frame
-
 # Drop scale_ciaf1_fuel column if it exists
 if("scale_ciaf1_fuel" %in% names(df)) {
   df$scale_ciaf1_fuel <- NULL
@@ -2471,7 +2335,7 @@ df$scale_ciaf1_fuel <- 0
 
 # Assign values to scale_ciaf1_fuel based on cooking_fuel
 df$scale_ciaf1_fuel <- ifelse(df$cooking_fuel == 1, 0,
-                              ifelse(df$cooking_fuel == 0, 0.5, df$scale_ciaf1_fuel)))
+                              ifelse(df$cooking_fuel == 0, 0.5, df$scale_ciaf1_fuel))
 ```
 
 capture drop scale_ciaf1_female
@@ -2500,9 +2364,6 @@ replace scale_ciaf1_caste = 0 if low_caste == 0
 replace scale_ciaf1_caste = 2.5 if low_caste == 1
 
 ```{r}
-# Assuming your data is in a data frame named 'df'
-# Replace 'df' with the name of your data frame
-
 # Drop scale_ciaf1_caste column if it exists
 if("scale_ciaf1_caste" %in% names(df)) {
   df$scale_ciaf1_caste <- NULL
@@ -2522,9 +2383,6 @@ replace scale_ciaf1_priority = 0 if priority_state == 0
 replace scale_ciaf1_priority = 1 if priority_state == 1
 
 ```{r}
-# Assuming your data is in a data frame named 'df'
-# Replace 'df' with the name of your data frame
-
 # Drop scale_ciaf1_priority column if it exists
 if("scale_ciaf1_priority" %in% names(df)) {
   df$scale_ciaf1_priority <- NULL
@@ -2563,11 +2421,10 @@ capture drop ciaf_decile
 recode dist_ciaf_decile (0.2 .3 = 1 "< 30%")(0.4 = 2 "40%") (0.5 = 3 "50%")(0.6 = 4 "60%")(0.7 = 5 "70%")(0.8 = 6 "80%"),
 
 ```{r}
-# Assuming your data is in a data frame named 'df'
-# Replace 'df' with the name of your data frame
+# shdistri was renamed to shdist
 
-# Calculate mean CIAF by shdistri and sort
-df <- df %>% group_by(shdistri) %>% arrange(shdistri) %>% 
+# Calculate mean CIAF by shdist and sort
+df <- df %>% group_by(shdist) %>% arrange(shdist) %>% 
   mutate(dist_ciaf_mean = mean(ciaf, na.rm = TRUE)) %>% ungroup()
 
 # Drop mean_ciaf_dist column if it exists
@@ -2604,9 +2461,9 @@ recode dist_wasted_decile (0 = 0 "0-10%")(0.1 = 1 "10-20%")(.2 = 2 "20-30%")(0.3
 , gen(wasted_decile)
 
 ```{r}
-# Calculate the mean 'wasted' by 'shdistri' and create a new column 'dist_wasted_mean'
+# Calculate the mean 'wasted' by 'shdist' and create a new column 'dist_wasted_mean'
 df <- df %>%
-  group_by(shdistri) %>%
+  group_by(shdist) %>%
   mutate(dist_wasted_mean = mean(wasted, na.rm = TRUE)) %>%
   ungroup()
 
@@ -2621,43 +2478,35 @@ df$dist_wasted_decile <- round(df$dist_wasted_mean, 1)
 
 # Create a new column 'wasted_decile' based on the conditions specified
 df$wasted_decile <- cut(df$dist_wasted_decile,
-                        breaks = c(-Inf, 0, 0.1, 0.2, 0.3, 0.4, 0.5, Inf),
+                        breaks = c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6),
                         labels = c("0-10%", "10-20%", "20-30%", "30-40%", "40-50%", "50-60%"),
                         right = FALSE)
+
+
+#df <- df %>% 
+#  group_by(shdist) %>% 
+#  mutate(dist_wasted_mean = mean(wasted)) %>% 
+#  ungroup() %>% 
+#  mutate(mean_wasted_dist = case_when(
+#           dist_wasted_mean <= 0.399999 ~ "1. < 40%",
+#           dist_wasted_mean <= 0.6 & dist_wasted_mean > 0.399999 ~ "2. 40-60%",
+#           dist_wasted_mean > 0.6 ~ "3. > 60%"
+#         ),
+#         dist_wasted_decile = round(dist_wasted_mean, 0.1),
+#         wasted_decile = case_when(
+#           dist_wasted_decile == 0 ~ "0-10%",
+#           dist_wasted_decile == 0.1 ~ "10-20%",
+#           dist_wasted_decile == 0.2 ~ "20-30%",
+#           dist_wasted_decile == 0.3 ~ "30-40%",
+#           dist_wasted_decile == 0.4 ~ "40-50%",
+#           dist_wasted_decile == 0.5 ~ "50-60%",
+#           TRUE ~ ""
+#         )) 
 ```
-
-
-
-
-
-*drop if child_age > 60 | stunted ==.
-*count
-*scalar all_under5 = r(N)
-*drop if child_age > 24 
-*count
-*scalar all_under2 = r(N)
-*drop if bidx != 1
-*count
-*scalar lastchild_under2 = r(N)
-*drop if missing_covariates == 1 
-*count
-*scalar sample_cca = r(N)
-capture drop _merge
-
-/*log using "results\scratch_priority_districts.smcl"
-levelsof state, local(state_num)
-foreach l of local state_num {
-tab sdistri state if state == `l' 
-tab sdistri state if state == `l' , nolab
-}
-log close
-translate "results\scratch_priority_districts.smcl" "results\scratch_priority_districts.pdf"
-*/
 
 ```{r}
-##Commented out code
+df$state
 ```
-
 
 capture drop priority_district 
 capture drop dist_priority
@@ -2666,44 +2515,194 @@ replace dist_priority = 0 if dist_priority != 9999
 replace dist_priority = 1 if dist_priority == 9999
 
 ```{r}
+if ('priority_district' %in% colnames(df)) {
+  df$priority_district <- NULL
+}
+
 df <- df %>% 
-  group_by(shdistri) %>% 
-  mutate(dist_wasted_mean = mean(wasted)) %>% 
-  ungroup() %>% 
-  mutate(mean_wasted_dist = case_when(
-           dist_wasted_mean <= 0.399999 ~ "1. < 40%",
-           dist_wasted_mean <= 0.6 & dist_wasted_mean > 0.399999 ~ "2. 40-60%",
-           dist_wasted_mean > 0.6 ~ "3. > 60%"
-         ),
-         dist_wasted_decile = round(dist_wasted_mean, 0.1),
-         wasted_decile = case_when(
-           dist_wasted_decile == 0 ~ "0-10%",
-           dist_wasted_decile == 0.1 ~ "10-20%",
-           dist_wasted_decile == 0.2 ~ "20-30%",
-           dist_wasted_decile == 0.3 ~ "30-40%",
-           dist_wasted_decile == 0.4 ~ "40-50%",
-           dist_wasted_decile == 0.5 ~ "50-60%",
-           TRUE ~ ""
-         )) 
+  mutate(dist_priority = case_when(sdistri %in% c(300, 301, 305, 313, 317, 318, 204, 205, 206, 209, 210, 211, 212, 214, 236, 238, 401, 402, 406, 416, 417, 351, 352, 353, 356, 358, 359, 362, 366, 367, 368, 369, 424, 425, 426, 427, 428, 429, 431, 441, 446, 453, 454, 460, 461, 462, 463, 464, 465, 389, 390, 391, 394, 396, 397, 398, 399, 106, 107, 114, 115, 116, 121, 123, 124, 125, 130, 149, 150, 151, 152, 153, 154, 155, 174, 176, 177, 180, 181, 182, 183, 186, 200, 201, 202, 59, 61, 68, 543, 544, 551, 552, 245, 247, 249, 252, 255, 256, 258, 90, 92, 468, 469, 472, 484, 485, 487, 489, 491, 75, 77, 80, 87, 89, 23, 25, 27, 34, 3, 5, 6, 16, 17, 18, 556, 557, 559, 560, 561, 565, 579, 580, 588, 592, 593, 272, 273, 274, 280, 293, 295, 296, 299, 281, 286, 287, 288, 634, 35, 39, 44, 47, 54, 242, 605, 606, 614, 623, 628, 631, 291, 329, 330, 332, 333, 343, 261, 262, 267, 269, 270, 271, 532, 538, 511, 523, 499, 498, 497, 508, 514, 515, 512, 279, 625, 184), TRUE ~ 9999, TRUE ~ NA_real_)) %>% 
+  mutate(dist_priority = if_else(dist_priority != 9999, 0, 1))
+
+                           
+
+# To mimic the 'capture drop' behavior in R, you can use the following lines of code
+#if ('priority_district' %in% colnames(df)) {
+#  df$priority_district <- NULL
+#}
+#if ('dist_priority' %in% colnames(df)) {
+#  df$dist_priority <- NULL
+#}
+
+# Create a new column 'dist_priority' based on the values in the 'sdistri' column
+#df$dist_priority <- ifelse(df$sdistri %in% c(300, 301, 305, 313, 317, 318, 204, 205, 206, 209, 210, 211, 212, 214, 236, 238, 401, 402, 406, 416, 417, 351, 352, 353, 356, 358, #359, 362, 366, 367, 368, 369, 424, 425, 426, 427, 428, 429, 431, 441, 446, 453, 454, 460, 461, 462, 463, 464, 465, 389, 390, 391, 394, 396, 397, 398, 399, 106, 107, 114, 115, #116, 121, 123, 124, 125, 130, 149, 150, 151, 152, 153, 154, 155, 174, 176, 177, 180, 181, 182, 183, 186, 200, 201, 202, 59, 61, 68, 543, 544, 551, 552, 245, 247, 249, 252, #255, 256, 258, 90, 92, 468, 469, 472, 484, 485, 487, 489, 491, 75, 77, 80, 87, 89, 23, 25, 27, 34, 3, 5, 6, 16, 17, 18, 556, 557, 559, 560, 561, 565, 579, 580, 588, 592, 593, #272, 273, 274, 280, 293, 295, 296, 299, 281, 286, 287, 288, 634, 35, 39, 44, 47, 54, 242, 605, 606, 614, 623, 628, 631, 291, 329, 330, 332, 333, 343, 261, 262, 267, 269, 270, #271, 532, 538, 511, 523, 499, 498, 497, 508, 514, 515, 512, 279, 625, 184), 9999, 0)
+
+# Update 'dist_priority' values
+#df$dist_priority[df$dist_priority != 9999] <- 0
+#df$dist_priority[df$dist_priority == 9999] <- 1
+
 ```
+
 
 
 
 ```{r}
-# To mimic the 'capture drop' behavior in R, you can use the following lines of code
-if ('priority_district' %in% colnames(df)) {
-  df$priority_district <- NULL
-}
-if ('dist_priority' %in% colnames(df)) {
-  df$dist_priority <- NULL
-}
-
-# Create a new column 'dist_priority' based on the values in the 'sdistri' column
-df$dist_priority <- ifelse(df$sdistri %in% c(300, 301, 305, 313, 317, 318, 204, 205, 206, 209, 210, 211, 212, 214, 236, 238, 401, 402, 406, 416, 417, 351, 352, 353, 356, 358, 359, 362, 366, 367, 368, 369, 424, 425, 426, 427, 428, 429, 431, 441, 446, 453, 454, 460, 461, 462, 463, 464, 465, 389, 390, 391, 394, 396, 397, 398, 399, 106, 107, 114, 115, 116, 121, 123, 124, 125, 130, 149, 150, 151, 152, 153, 154, 155, 174, 176, 177, 180, 181, 182, 183, 186, 200, 201, 202, 59, 61, 68, 543, 544, 551, 552, 245, 247, 249, 252, 255, 256, 258, 90, 92, 468, 469, 472, 484, 485, 487, 489, 491, 75, 77, 80, 87, 89, 23, 25, 27, 34, 3, 5, 6, 16, 17, 18, 556, 557, 559, 560, 561, 565, 579, 580, 588, 592, 593, 272, 273, 274, 280, 293, 295, 296, 299, 281, 286, 287, 288, 634, 35, 39, 44, 47, 54, 242, 605, 606, 614, 623, 628, 631, 291, 329, 330, 332, 333, 343, 261, 262, 267, 269, 270, 271, 532, 538, 511, 523, 499, 498, 497, 508, 514, 515, 512, 279, 625, 184), 9999, 0)
-
-# Update 'dist_priority' values
-df$dist_priority[df$dist_priority != 9999] <- 0
-df$dist_priority[df$dist_priority == 9999] <- 1
-
+rev(colnames(df))
 ```
 
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+SOME LOGISTIC REGRESSION CODE, NOT CLEAR WHAT FOR
+
+order wgt real_id mother_id father_id bidx haz waz whz stunted wasted underweight ciaf  ///
+child_age age_group age_group_5y female ///
+maternal_height maternal_bmi marital_age firstbirth_18y preg_deworm preg_ironyn preg_iron delivery_place preg_deworm ///
+wealth_quintile hhadults rural state bpl_card caste religion ///
+total_living_children siblings sibling_under5 brothers_home sisters_home *birth_interval multiplet ///
+dietary_diversity_score bf_start vitamin_a child_anemia child_fever child_diarrhea birthweight child_deworm ///
+water_source water_treatment stool_disposal toilet_type toiletshare air_quality anganwadi_support season
+
+```{r}
+df0 <- data.frame(df, copy = TRUE)
+```
+
+```{r}
+df <- data.frame(df0, copy = TRUE)
+```
+
+```{r}
+# Removed missing variables: bpl_card
+
+# Reorder variables in the data frame
+df <- df %>% arrange(wgt, real_id, mother_id, father_id, bidx, haz, waz, whz, stunted, wasted, underweight, ciaf,
+                    child_age, age_group, age_group_5y, female, maternal_height, maternal_bmi, marital_age,
+                    firstbirth_18y, preg_deworm, preg_ironyn, preg_iron, delivery_place, preg_deworm,
+                    wealth_quintile, hhadults, rural, state, caste, religion,
+                    total_living_children, siblings, sibling_under5, brothers_home, sisters_home,
+                    pre_birth_interval, succeeding_birth_interval, multiplet, dietary_diversity_score, bf_start, vitamin_a,
+                    child_anemia, child_fever, child_diarrhea, birthweight, child_deworm, water_source,
+                    water_treatment, stool_disposal, toilet_type, toiletshare, air_quality,
+                    anganwadi_support, season)
+```
+
+global cat_child i.age_group i.female
+global child age_group female
+global predictors maternal_height firstbirth_18y preg_iron hhadults rural state bpl_card caste religion  siblings sibling_under5 ///
+brothers_home sisters_home pre_birth_interval water_treatment toilet_type  water_home floor_finish wall_finish roof_finish house_finish use_soap ///
+kitchen cooking_fuel reading
+global cat_predictors i.maternal_height i.firstbirth_18y i.preg_iron i.hhadults i.rural i.state_zones i.bpl_card i.caste i.religion ///
+ i.siblings i.sibling_under5 i.brothers_home i.sisters_home i.pre_birth_interval i.water_treatment i.toilet_type ///
+i.water_home i.floor_finish i.wall_finish i.roof_finish i.house_finish i.use_soap i.kitchen i.cooking_fuel i.reading ///
+i.states i.dist_ciaf_decile 
+
+```{r}
+cat_child <- c("age_group", "female")
+assign("cat_child", cat_child, envir = .GlobalEnv)
+
+child <- c("age_group", "female")
+assign("child", child, envir = .GlobalEnv)
+
+# "bpl_card" variable removed as it absent in the new dataset
+
+predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state", "caste", "religion", "siblings", 
+                "sibling_under5", "brothers_home", "sisters_home", "pre_birth_interval", "water_treatment", "toilet_type", 
+                "water_home", "floor_finish", "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", "cooking_fuel", "reading")
+assign("predictors", predictors, envir = .GlobalEnv)
+
+cat_predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state_zones",
+                    "caste", "religion", "siblings", "sibling_under5", "brothers_home",
+                    "sisters_home", "pre_birth_interval", "water_treatment", "toilet_type", "water_home",
+                    "floor_finish", "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen",
+                    "cooking_fuel", "reading", "states", "dist_ciaf_decile")
+assign("cat_predictors", cat_predictors, envir = .GlobalEnv)
+#df[, cat_predictors] <- lapply(df[, cat_predictors], factor)
+
+
+# Define categories for age_group and female variables
+#cat_child <- c("0-5 months", "6-11 months", "12-23 months", "24-35 months", "36-47 months", "48-59 months")
+#cat_age_group <- c("0-5 months", "6-11 months", "12-23 months", "24-35 months", "36-47 months", "48-59 months")
+
+# Define variables for predictors and categorical predictors
+#predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state", "bpl_card", 
+#                "caste", "religion", "siblings", "sibling_under5", "brothers_home", "sisters_home", 
+#                "pre_birth_interval", "water_treatment", "toilet_type", "water_home", "floor_finish", 
+#                "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", "cooking_fuel", 
+#                "reading")
+#cat_predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state_zones", 
+#                    "bpl_card", "caste", "religion", "siblings", "sibling_under5", "brothers_home", 
+#                    "sisters_home", "pre_birth_interval", "water_treatment", "toilet_type", "water_home", 
+#                    "floor_finish", "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", 
+#                    "cooking_fuel", "reading", "states", "dist_ciaf_decile")
+```
+
+global model_vars house_finish m_ht maternal_education toilet  cooking_fuel female christian low_caste
+global cat_model_vars ib(2).house_finish ib(1).m_ht ib(3).maternal_education ///
+ib(1).toilet i.state_zones  ib(1).cooking_fuel ib(1).female ib(1).christian i.low_caste
+
+```{r}
+# Define variable names
+model_vars <- c("house_finish", "m_ht", "maternal_education", "toilet", "cooking_fuel", "female", "christian", "low_caste")
+cat_model_vars <- c("as.factor(house_finish)", "as.factor(m_ht)", "as.factor(maternal_education)", "as.factor(toilet)", "as.factor(cooking_fuel)", "as.factor(female)", "as.factor(christian)", "as.factor(low_caste)")
+
+ind_vars <- model.matrix(~ color - 1, data = df)
+
+df <- cbind(df, ind_vars)
+
+
+# Combine the variable names into a single string
+model_formula <- paste(cat_model_vars, collapse = " + ")
+```
+
+global model_vars house_finish m_ht maternal_education toilet  cooking_fuel female christian low_caste
+global cat_model_vars ib(2).house_finish ib(1).m_ht ib(3).maternal_education ///
+ib(1).toilet i.state_zones  ib(1).cooking_fuel ib(1).female ib(1).christian i.low_caste
+
+quietly logistic ciaf ib(2).house_finish ib(1).m_ht ib(3).maternal_education ///
+ib(1).toilet i.state_zones  ib(1).cooking_fuel ib(1).female  i.low_caste i.priority_state, coef
+quietly predict prob if e(sample)
+gen missing_covariates = 1 if prob == . 
+capture drop prob
+
+
+```{r}
+# Define category variables
+cat_child <- c("age_group", "female")
+
+# Define predictor variables
+child <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state", "caste", "religion",
+           "siblings", "sibling_under5", "brothers_home", "sisters_home", "pre_birth_interval", "water_treatment", "toilet_type",
+           "water_home", "floor_finish", "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", "cooking_fuel",
+           "reading")
+
+# Define categorical predictor variables
+cat_predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state_zones", "caste",
+                    "religion", "siblings", "sibling_under5", "brothers_home", "sisters_home", "pre_birth_interval",
+                    "water_treatment", "toilet_type", "water_home", "floor_finish", "wall_finish", "roof_finish",
+                    "house_finish", "use_soap", "kitchen", "cooking_fuel", "reading", "states", "dist_ciaf_decile")
+
+# Define model variables
+model_vars <- c("house_finish", "m_ht", "maternal_education", "toilet", "cooking_fuel", "female", "christian", "low_caste")
+
+# Define categorical model variables
+cat_model_vars <- list(ib2_house_finish = "house_finish", ib1_m_ht = "m_ht", ib3_maternal_education = "maternal_education",
+                       ib1_toilet = "toilet", i_state_zones = "state_zones", ib1_cooking_fuel = "cooking_fuel",
+                       ib1_female = "female", i_low_caste = "low_caste")
+
+# Select variables for logistic regression
+logistic_data <- df %>%
+  select(c("ciaf", model_vars, cat_model_vars, cat_child)) %>%
+  drop_na() # Drop rows with missing values
+
+# Fit logistic regression model
+logistic_model <- glm(ciaf ~ ., data = logistic_data, family = binomial(link = "logit"))
+
+# Predict probabilities
+logistic_data$prob <- predict(logistic_model, type = "response")
+
+# Create missing_covariates variable
+logistic_data$missing_covariates <- ifelse(is.na(logistic_data$prob), 1, 0)
+
+# Drop prob variable
+logistic_data <- logistic_data %>% select(-prob)
+```
