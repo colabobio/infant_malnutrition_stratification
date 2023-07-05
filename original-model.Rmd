@@ -121,7 +121,7 @@ df$maternal_height_less_4feet8inches <- ifelse(df$maternal_height_cm < 142.24, 1
 df$maternal_edu_no <- ifelse(df$mother_education == 0, 1, 0)
 df$maternal_edu_1_7 <- ifelse(df$mother_education >= 1 & df$mother_education <= 7,
                               1, 0)
-df$maternal_edu_7_10 <- ifelse(df$mother_education >= 7 & df$mother_education <= 10,
+df$maternal_edu_greater_7_10 <- ifelse(df$mother_education >= 7 & df$mother_education <= 10,
                               1, 0)
 
 df$sex_male <- ifelse(df$female == "0. male",
@@ -147,34 +147,36 @@ df$mean_district_CIAF_80_89.9 <- ifelse(df$ciaf_decile == "80%", 1, 0)
 ```
 
 ```{r}
-df[,c("maternal_height_4feet8inches_to_less_5feetinches",
+df_filter <- df[,c("maternal_height_4feet8inches_to_less_5feetinches",
        "maternal_height_less_4feet8inches",
       "maternal_edu_no",
       "maternal_edu_1_7",
-      "maternal_edu_7_10",
+      "maternal_edu_greater_7_10",
       "sex_male",
       "pre_birth_interval_less_than_equal_to_24_months",
       "birth_weight_less_than_1800_g",
+      "birth_weight_1800_g_2500_g",
       "num_siblings_two_or_more",
       "low_caste",
       "toliet_access_no",
       "house_partially_finished_no",
       "separate_kitchen_no",
-      "cooking_fuel_solid",
       "Northeast_focus",
       "mean_district_CIAF_40_49.9",
       "mean_district_CIAF_50_59.9",
       "mean_district_CIAF_60_69.9",
       "mean_district_CIAF_70_79.9",
-      "mean_district_CIAF_80_89.9")] %>% na.omit()
+      "mean_district_CIAF_80_89.9", 
+      "ciaf")] %>% na.omit()
 ```
 
 ```{r}
 
 base_model <- function(df) {
+  
   # Calculate the linear term in the logistic function of the model
   # p(x) = 1 / (1+exp(-lp(x))
-  lp = with(df, 
+  lp = with(df_filter, 
             -1.62 - 
               0.34 * maternal_height_4feet8inches_to_less_5feetinches + 
               0.79 * maternal_height_less_4feet8inches +
@@ -186,15 +188,11 @@ base_model <- function(df) {
               0.88 * birth_weight_less_than_1800_g +
               0.46 * birth_weight_1800_g_2500_g +
               0.07 * num_siblings_two_or_more +
-              0.14 * low_caste_yes +
+              0.14 * low_caste +
               0.18 * toliet_access_no +
               0.12 * house_partially_finished_no +
               0.07 * separate_kitchen_no +
-              0.07 * cooking_fuel_solid +
-              0.07 * uses_soap_after_use +
               -0.16 * Northeast_focus +
-              -0.23 * Other_focus +
-              -0.09 * high_priority_district_yes +
               0.29 * mean_district_CIAF_40_49.9 +
               0.60 *  mean_district_CIAF_50_59.9 +
               0.87 *  mean_district_CIAF_60_69.9 +
@@ -204,16 +202,18 @@ base_model <- function(df) {
   return(lp)
 }
 
-logistic_function = 1 / (1 + exp(-1 * lp))
 ```
 
 ```{r}
-data0 <- (...)
+data0 <- df_filter
+
 ```
 
 ```{r}
 source('./mdl-evaluation.R')
 ```
+
+
 
 ```{r}
 pred0 <- unlist(map(1:nrow(data0), function(x) base_model(data0[x,]))) # prediction in log-odds (probabilities on logit scale)
@@ -221,12 +221,13 @@ prob0 <- 1 / (1 + exp(-pred0))
 ```
 
 ```{r}
+mdl_folder0 = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/"
 # Generate the data frame with the data needed for the calibration and ROC plots
-plot_data0 <- data.frame(out = data0$out, logodds = pred0, prob = prob0)
+plot_data0 <- data.frame(out = data0$ciaf, logodds = pred0, prob = prob0)
 
 cal_plot(base_model, plot_data0, "prob", model_label = '', dir = mdl_folder0, fn = "cal_plot.pdf")
 cal_c0 <- cal_coeff(plot_data0, "prob", mdl_folder0, "cal_plot_coefficients.txt")
 print(cal_c0)
 
-roc_plot(data0$out, prob0, dir = mdl_folder0, fn = "roc_plot.pdf")
+roc_plot(data0$ciaf, prob0, dir = mdl_folder0, fn = "roc_plot.pdf")
 ```
