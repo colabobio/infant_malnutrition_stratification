@@ -72,7 +72,7 @@ write.csv(df, here(path, dffile), row.names=FALSE)
 
 ```{r}
 path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-path <- "data/DHS-2019-21"
+#path <- "data/DHS-2019-21"
 dffile <- "merged.rda"
 save(df, file = here(path, dffile)) 
 ```

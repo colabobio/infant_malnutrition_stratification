@@ -31,7 +31,7 @@ library(tidyr)
 
 ```{r}
 path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-#path <- "data/DHS-2019-21"
+#path <- "data/DHS-2019-21/"
 datafile <- "merged.rda"
 load(paste0(path, datafile))
 ```
@@ -52,7 +52,6 @@ fct_case_when <- function(...) {
   factor(dplyr::case_when(...), levels=levels)
 }
 ```
-
 
 
 **** Add
@@ -1985,12 +1984,15 @@ if ("use_soap" %in% names(df)) {
   df <- df %>% select(-use_soap)
 }
 
-df$use_soap <- NA
-df$use_soap <- case_when(
-    df$hv230a < 3 ~ 0,
-    df$hv232 == 1 ~ 1,
-    TRUE ~ NA_real_
-)
+#df$use_soap <- NA
+#df$use_soap <- case_when(
+#    df$hv230a < 3 ~ 0,
+#    df$hv232 == 1 ~ 1,
+#    TRUE ~ NA_real_
+#)
+
+df$use_soap[df$hv230a < 3] <- 0
+df$use_soap[df$hv232 == 1] <- 1
 ```
 
 capture drop cooking_fuel
@@ -2544,173 +2546,13 @@ if ('priority_district' %in% colnames(df)) {
 ```
 
 
-
-
 ```{r}
 rev(colnames(df))
 ```
 
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/recoding.rda"
-#path <- "data/DHS-2019-21"
-#dffile <- "merged.rda"
-save(df, file = path) 
-```
-
-
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-SOME LOGISTIC REGRESSION CODE, NOT CLEAR WHAT FOR
-
-order wgt real_id mother_id father_id bidx haz waz whz stunted wasted underweight ciaf  ///
-child_age age_group age_group_5y female ///
-maternal_height maternal_bmi marital_age firstbirth_18y preg_deworm preg_ironyn preg_iron delivery_place preg_deworm ///
-wealth_quintile hhadults rural state bpl_card caste religion ///
-total_living_children siblings sibling_under5 brothers_home sisters_home *birth_interval multiplet ///
-dietary_diversity_score bf_start vitamin_a child_anemia child_fever child_diarrhea birthweight child_deworm ///
-water_source water_treatment stool_disposal toilet_type toiletshare air_quality anganwadi_support season
-
-```{r}
-df0 <- data.frame(df, copy = TRUE)
-```
-
-```{r}
-df <- data.frame(df0, copy = TRUE)
-```
-
-```{r}
-# Removed missing variables: bpl_card
-
-# Reorder variables in the data frame
-df <- df %>% arrange(wgt, real_id, mother_id, father_id, bidx, haz, waz, whz, stunted, wasted, underweight, ciaf,
-                    child_age, age_group, age_group_5y, female, maternal_height, maternal_bmi, marital_age,
-                    firstbirth_18y, preg_deworm, preg_ironyn, preg_iron, delivery_place, preg_deworm,
-                    wealth_quintile, hhadults, rural, state, caste, religion,
-                    total_living_children, siblings, sibling_under5, brothers_home, sisters_home,
-                    pre_birth_interval, succeeding_birth_interval, multiplet, dietary_diversity_score, bf_start, vitamin_a,
-                    child_anemia, child_fever, child_diarrhea, birthweight, child_deworm, water_source,
-                    water_treatment, stool_disposal, toilet_type, toiletshare, air_quality,
-                    anganwadi_support, season)
-```
-
-global cat_child i.age_group i.female
-global child age_group female
-global predictors maternal_height firstbirth_18y preg_iron hhadults rural state bpl_card caste religion  siblings sibling_under5 ///
-brothers_home sisters_home pre_birth_interval water_treatment toilet_type  water_home floor_finish wall_finish roof_finish house_finish use_soap ///
-kitchen cooking_fuel reading
-global cat_predictors i.maternal_height i.firstbirth_18y i.preg_iron i.hhadults i.rural i.state_zones i.bpl_card i.caste i.religion ///
- i.siblings i.sibling_under5 i.brothers_home i.sisters_home i.pre_birth_interval i.water_treatment i.toilet_type ///
-i.water_home i.floor_finish i.wall_finish i.roof_finish i.house_finish i.use_soap i.kitchen i.cooking_fuel i.reading ///
-i.states i.dist_ciaf_decile 
-
-```{r}
-cat_child <- c("age_group", "female")
-assign("cat_child", cat_child, envir = .GlobalEnv)
-
-child <- c("age_group", "female")
-assign("child", child, envir = .GlobalEnv)
-
-# "bpl_card" variable removed as it absent in the new dataset
-
-predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state", "caste", "religion", "siblings", 
-                "sibling_under5", "brothers_home", "sisters_home", "pre_birth_interval", "water_treatment", "toilet_type", 
-                "water_home", "floor_finish", "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", "cooking_fuel", "reading")
-assign("predictors", predictors, envir = .GlobalEnv)
-
-cat_predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state_zones",
-                    "caste", "religion", "siblings", "sibling_under5", "brothers_home",
-                    "sisters_home", "pre_birth_interval", "water_treatment", "toilet_type", "water_home",
-                    "floor_finish", "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen",
-                    "cooking_fuel", "reading", "states", "dist_ciaf_decile")
-assign("cat_predictors", cat_predictors, envir = .GlobalEnv)
-#df[, cat_predictors] <- lapply(df[, cat_predictors], factor)
-
-
-# Define categories for age_group and female variables
-#cat_child <- c("0-5 months", "6-11 months", "12-23 months", "24-35 months", "36-47 months", "48-59 months")
-#cat_age_group <- c("0-5 months", "6-11 months", "12-23 months", "24-35 months", "36-47 months", "48-59 months")
-
-# Define variables for predictors and categorical predictors
-#predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state", "bpl_card", 
-#                "caste", "religion", "siblings", "sibling_under5", "brothers_home", "sisters_home", 
-#                "pre_birth_interval", "water_treatment", "toilet_type", "water_home", "floor_finish", 
-#                "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", "cooking_fuel", 
-#                "reading")
-#cat_predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state_zones", 
-#                    "bpl_card", "caste", "religion", "siblings", "sibling_under5", "brothers_home", 
-#                    "sisters_home", "pre_birth_interval", "water_treatment", "toilet_type", "water_home", 
-#                    "floor_finish", "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", 
-#                    "cooking_fuel", "reading", "states", "dist_ciaf_decile")
-```
-
-global model_vars house_finish m_ht maternal_education toilet  cooking_fuel female christian low_caste
-global cat_model_vars ib(2).house_finish ib(1).m_ht ib(3).maternal_education ///
-ib(1).toilet i.state_zones  ib(1).cooking_fuel ib(1).female ib(1).christian i.low_caste
-
-```{r}
-# Define variable names
-model_vars <- c("house_finish", "m_ht", "maternal_education", "toilet", "cooking_fuel", "female", "christian", "low_caste")
-cat_model_vars <- c("as.factor(house_finish)", "as.factor(m_ht)", "as.factor(maternal_education)", "as.factor(toilet)", "as.factor(cooking_fuel)", "as.factor(female)", "as.factor(christian)", "as.factor(low_caste)")
-
-ind_vars <- model.matrix(~ color - 1, data = df)
-
-df <- cbind(df, ind_vars)
-
-
-# Combine the variable names into a single string
-model_formula <- paste(cat_model_vars, collapse = " + ")
-```
-
-global model_vars house_finish m_ht maternal_education toilet  cooking_fuel female christian low_caste
-global cat_model_vars ib(2).house_finish ib(1).m_ht ib(3).maternal_education ///
-ib(1).toilet i.state_zones  ib(1).cooking_fuel ib(1).female ib(1).christian i.low_caste
-
-quietly logistic ciaf ib(2).house_finish ib(1).m_ht ib(3).maternal_education ///
-ib(1).toilet i.state_zones  ib(1).cooking_fuel ib(1).female  i.low_caste i.priority_state, coef
-quietly predict prob if e(sample)
-gen missing_covariates = 1 if prob == . 
-capture drop prob
-
-
-```{r}
-# Define category variables
-cat_child <- c("age_group", "female")
-
-# Define predictor variables
-child <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state", "caste", "religion",
-           "siblings", "sibling_under5", "brothers_home", "sisters_home", "pre_birth_interval", "water_treatment", "toilet_type",
-           "water_home", "floor_finish", "wall_finish", "roof_finish", "house_finish", "use_soap", "kitchen", "cooking_fuel",
-           "reading")
-
-# Define categorical predictor variables
-cat_predictors <- c("maternal_height", "firstbirth_18y", "preg_iron", "hhadults", "rural", "state_zones", "caste",
-                    "religion", "siblings", "sibling_under5", "brothers_home", "sisters_home", "pre_birth_interval",
-                    "water_treatment", "toilet_type", "water_home", "floor_finish", "wall_finish", "roof_finish",
-                    "house_finish", "use_soap", "kitchen", "cooking_fuel", "reading", "states", "dist_ciaf_decile")
-
-# Define model variables
-model_vars <- c("house_finish", "m_ht", "maternal_education", "toilet", "cooking_fuel", "female", "christian", "low_caste")
-
-# Define categorical model variables
-cat_model_vars <- list(ib2_house_finish = "house_finish", ib1_m_ht = "m_ht", ib3_maternal_education = "maternal_education",
-                       ib1_toilet = "toilet", i_state_zones = "state_zones", ib1_cooking_fuel = "cooking_fuel",
-                       ib1_female = "female", i_low_caste = "low_caste")
-
-# Select variables for logistic regression
-logistic_data <- df %>%
-  select(c("ciaf", model_vars, cat_model_vars, cat_child)) %>%
-  drop_na() # Drop rows with missing values
-
-# Fit logistic regression model
-logistic_model <- glm(ciaf ~ ., data = logistic_data, family = binomial(link = "logit"))
-
-# Predict probabilities
-logistic_data$prob <- predict(logistic_model, type = "response")
-
-# Create missing_covariates variable
-logistic_data$missing_covariates <- ifelse(is.na(logistic_data$prob), 1, 0)
-
-# Drop prob variable
-logistic_data <- logistic_data %>% select(-prob)
+path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+#path <- "data/DHS-2019-21/"
+dffile <- "recoded.rda"
+save(df, file = here(path, dffile)) 
 ```
