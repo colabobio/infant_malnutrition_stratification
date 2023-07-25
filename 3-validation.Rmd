@@ -14,9 +14,9 @@ https://www.techtips.surveydesign.com.au/post/the-recode-command
 library(Hmisc)
 library(rms)
 library(glmnet)
-library(tidyr)
 library(dplyr)
-library(purrr)
+library(imputeTS)
+library(mice)
 library(ROCit)
 ```
 
@@ -25,10 +25,10 @@ source('./mdl-evaluation.R')
 ```
 
 ```{r}
-#path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-path <- "data/DHS-2019-21/"
+path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+#path <- "data/DHS-2019-21/"
 datafile <- "recoded.rda"
-load(paste0(path, datafile))
+load("/Users/justi/OneDrive/Desktop/colabo_data/data/recoding.rda")
 ```
 
 ```{r}
@@ -55,14 +55,46 @@ df$low_caste <- ifelse(df$low_caste == 1, 1, 0)
 df$toliet_access_no <- ifelse(df$toilet_type == "0. no toilet", 1,0)
 df$house_partially_finished_no <- ifelse(df$house_finish != "1. some concrete material", 1, 0)
 df$separate_kitchen_no <- ifelse(df$kitchen == 0, 1,0)
-df$cooking_fuel_solid <- ifelse(df$cooking_fuel == 0, 1, 0)
-df$Northeast_focus <- ifelse(df$state_zones == "1. North-Eastern", 1, 0)
-#df$Other_focus <- ifelse(df$state_zones == "")## check over
+df$Northeast_focus <- ifelse(df$focus_states == "1. NE Focus", 1, 0)
+df$Other_Focus <- ifelse(df$focus_states == "2. Other focus", 1, 0)
 df$mean_district_CIAF_40_49.9 <- ifelse(df$ciaf_decile == "40%", 1, 0)
 df$mean_district_CIAF_50_59.9 <- ifelse(df$ciaf_decile == "50%", 1, 0)
 df$mean_district_CIAF_60_69.9 <- ifelse(df$ciaf_decile == "60%", 1, 0)
 df$mean_district_CIAF_70_79.9 <- ifelse(df$ciaf_decile == "70%", 1, 0)
 df$mean_district_CIAF_80_89.9 <- ifelse(df$ciaf_decile == "80%", 1, 0)
+
+# remove cooking_fuel if it exists
+if ("cooking_fuel" %in% names(df)) {
+  df <- df %>% select(-cooking_fuel)
+}
+
+df$cooking_fuel <- case_when(
+  df$fuel_type == "1. electricity/gas/kerosene" ~ 1,
+  df$fuel_type == "2. wood/coal" | df$fuel_type == "3. straw/hay/dung" ~ 0,
+  TRUE ~ NA_real_
+)
+
+levels(df$cooking_fuel) <- c("0. solid fuel", "1. non-solid fuel")
+
+
+df$cooking_fuel_solid <- ifelse(df$cooking_fuel == 0, 1, 0)
+
+# # remove use_finish if it exists
+# if ("use_soap" %in% names(df)) {
+#   df <- df %>% select(-use_soap)
+# }
+# 
+# df$use_soap <- NA
+# df$use_soap <- case_when(
+#     df$hv230a < 3 & !is.na(df$hv232)  ~ 0,
+#     is.na(df$hv230a) & df$hv232 == 1  ~ 1,
+# TRUE ~ NA_real_
+# )
+
+
+
+
+
 ```
 
 ```{r}
@@ -80,7 +112,9 @@ model_vars <- c("maternal_height_4feet8inches_to_less_5feetinches",
                 "toliet_access_no",
                 "house_partially_finished_no",
                 "separate_kitchen_no",
+                "cooking_fuel_solid",
                 "Northeast_focus",
+                "Other_Focus",
                 "mean_district_CIAF_40_49.9",
                 "mean_district_CIAF_50_59.9",
                 "mean_district_CIAF_60_69.9",
@@ -89,7 +123,7 @@ model_vars <- c("maternal_height_4feet8inches_to_less_5feetinches",
                 "ciaf")
 
 model_coeffs <- c(intercept = -1.62,  
-                  maternal_height_4feet8inches_to_less_5feetinches = -0.34, 
+                  maternal_height_4feet8inches_to_less_5feetinches = 0.34, 
                   maternal_height_less_4feet8inches = 0.79,
                   maternal_edu_no = 0.45,
                   maternal_edu_1_7 = 0.30,
@@ -103,7 +137,9 @@ model_coeffs <- c(intercept = -1.62,
                   toliet_access_no = 0.18,
                   house_partially_finished_no = 0.12,
                   separate_kitchen_no = 0.07,
+                  cooking_fuel_solid = 0.07,
                   Northeast_focus = -0.16,
+                  Other_Focus = -0.23,
                   mean_district_CIAF_40_49.9 = 0.29,
                   mean_district_CIAF_50_59.9 = 0.60,
                   mean_district_CIAF_60_69.9 = 0.87,
@@ -116,7 +152,7 @@ df_model_nona <- na.omit(df_model)
 ```
 
 ```{r}
-df_model
+df_model %>%
 ```
 
 ```{r}
@@ -160,7 +196,7 @@ prob0
 ```{r}
 #mdl_folder0 = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/"
 mdl_folder0 = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/"
-mdl_folder0 <- "data/DHS-2019-21/orig-model-validation"
+#mdl_folder0 <- "data/DHS-2019-21/orig-model-validation"
 dir.create(mdl_folder0)
 
 
