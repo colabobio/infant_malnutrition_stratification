@@ -36,9 +36,6 @@ datafile <- "merged.rda"
 load(paste0(path, datafile))
 ```
 
-```{r}
-df
-```
 
 **** Some utilities
 
@@ -407,6 +404,7 @@ df$ciaf[df$stunted == 1 | df$wasted == 1 | df$underweight == 1] <- 1
 # Replace missing values with NA
 df$ciaf[is.na(df$stunted) | is.na(df$wasted) | is.na(df$underweight)] <- NA
 
+
 ```
 
 capture drop stunt_waste
@@ -493,6 +491,18 @@ df <- df %>%
   ))
 ```
 
+
+```{r}
+# Remove variables starting with "maternal_height_4feet8inches_to_less_5feetinches" if they exist
+df <- df %>%
+  select(-starts_with("maternal_height_4feet8inches_to_less_5feetinches"))
+
+df <- df %>%
+  mutate(maternal_height_4feet8inches_to_less_5feetinches = ifelse(df$maternal_height_cm > 142.24  & df$maternal_height_cm < 152.4, 1, 0) %>% as.factor(),
+         maternal_height_less_4feet8inches = ifelse(df$maternal_height_cm < 142.24, 1, 0) %>% as.factor())
+```
+
+
 capture drop maternal_bmi* 
 gen maternal_bmi_value = v445/100 
 replace maternal_bmi_value = . if maternal_bmi_value > 80 
@@ -535,7 +545,7 @@ df <- df %>%
   mutate(paternal_height_cm = hb3 / 10) %>%
   replace_na(list(paternal_height_cm = NA)) %>%
   mutate(paternal_height_cm = ifelse(paternal_height_cm > 999, NA, paternal_height_cm)) %>%
-  mutate(paternal_height = fct_case_when(
+  mutate(paternal_height = case_when(
     paternal_height_cm >= 160 & paternal_height_cm <= 230   ~ "1. 160+ cm",
     paternal_height_cm >= 155 & paternal_height_cm < 160    ~ "2. 155-159.9 cm",
     paternal_height_cm >= 150 & paternal_height_cm < 155    ~ "3. 150-154.9 cm",
@@ -1010,7 +1020,7 @@ if ("toilet_type" %in% colnames(df)) {
 
 # Recode the variable "hv205" and create a new variable called "toilet_type"
 df <- df %>% 
-  mutate(toilet_type = fct_case_when(
+  mutate(toilet_type = case_when(
     hv205 == 31 ~ "0. no toilet",    
     between(hv205, 11, 15) ~ "1. flush toilet",
     between(hv205, 21, 23) | between(hv205, 41, 96) ~ "2. pit or dry toilet",
@@ -1020,7 +1030,16 @@ df <- df %>%
 # Replace "toilet_type" with missing values if "child_age" is greater than 60
 df$toilet_type[df$child_age > 60] <- NA_character_
 
+
+
+df$toliet_access_no <- ifelse(df$toilet_type == "0. no toilet", 1,0)  %>% as.factor()
+
+df$toliet_access_no
+
 ```
+
+
+
 
 
 recode hv225 (0 = 0 "0. no") (1 = 1 "1. yes"), gen(toiletshare)
@@ -1056,6 +1075,24 @@ df <- df %>%
   ))
 ```
 
+
+```{r}
+# remove cooking_fuel if it exists
+if ("cooking_fuel" %in% names(df)) {
+  df <- df %>% select(-cooking_fuel)
+}
+
+df$cooking_fuel <- case_when(
+  df$fuel_type == "1. electricity/gas/kerosene" ~ 1,
+  df$fuel_type == "2. wood/coal" | df$fuel_type == "3. straw/hay/dung" ~ 0,
+  TRUE ~ NA_real_
+) %>% as.factor()
+
+df$cooking_fuel_solid <- ifelse(df$cooking_fuel == 0, 1, 0) %>% as.factor()
+
+```
+
+
 capture drop kitchen
 gen kitchen = hv242
 replace kitchen = 1 if hv241 == 2 | hv241 == 3
@@ -1071,6 +1108,13 @@ df <- df %>%
   mutate(kitchen = hv242) %>%
   mutate(kitchen = ifelse(hv241 == 2 | hv241 == 3, 1, kitchen))
 ```
+
+
+```{r}
+df$separate_kitchen_no <- ifelse(df$kitchen == 0, 1,0)  %>% as.factor()
+```
+
+
 
 capture drop air_quality //Basani et al 2010, from Subramanian
 gen air_quality = . 
@@ -1092,11 +1136,11 @@ if ("air_quality" %in% colnames(df)) {
 # Create 'air_quality' variable based on the conditions provided
 df <- df %>%
   mutate(air_quality = NA) %>%
-  mutate(air_quality = ifelse(fuel_type == 1, 1, air_quality)) %>%
-  mutate(air_quality = ifelse(hv242 == 1 & (fuel_type == 2 | fuel_type == 3), 2, air_quality)) %>%
-  mutate(air_quality = ifelse(hv242 != 1 & (fuel_type == 2 | fuel_type == 3), 3, air_quality)) %>%
-  mutate(air_quality = ifelse((hv241 == 2 | hv241 == 3) & (fuel_type == 2 | fuel_type == 3), 2, air_quality)) %>%
-  mutate(air_quality = ifelse(child_age > 60, NA, air_quality)) %>%
+  mutate(air_quality = ifelse(fuel_type == "1. electricity/gas/kerosene", 1, air_quality)) %>%
+  mutate(air_quality = ifelse(hv242 == 1 & (fuel_type == "2. wood/coal" | fuel_type == "3. straw/hay/dung"), 2, air_quality)) %>%
+  mutate(air_quality = ifelse(hv242 != 1 & (fuel_type == "2. wood/coal" | fuel_type == "3. straw/hay/dung"), 3, air_quality)) %>%
+  mutate(air_quality = ifelse((hv241 == 2 | hv241 == 3) & (fuel_type == "2. wood/coal" | fuel_type == "3. straw/hay/dung"), 2, air_quality)) %>%
+  mutate(air_quality = ifelse(child_age > 60, NA, air_quality))   %>%
   mutate(air_quality = fct_recode(as.factor(air_quality),
                                   "1. non-solid fuels" = "1",
                                   "solid fuels in separate kitchen" = "2",
@@ -1156,7 +1200,6 @@ capture drop female
 recode hv104 (1 = 0 "0. male") (2 = 1 "1.female"), gen(female)
 
 ```{r}
-
 # Remove 'female' variable if it exists
 if ("female" %in% colnames(df)) {
   df$female <- NULL
@@ -1172,6 +1215,19 @@ df <- df %>%
   mutate(female = fct_recode(as.factor(female),
                              "0. male" = "0",
                              "1. female" = "1"))
+```
+
+```{r}
+# Remove 'sex_male' variable if it exists
+if ("sex_male" %in% colnames(df)) {
+  df$sex_male <- NULL
+}
+
+df <- df %>% 
+  mutate(sex_male = ifelse(df$female == "0. male",
+                                   1,
+                                   0)  %>% as.factor())
+df$sex_male
 ```
 
 capture drop total_children_born
@@ -1226,6 +1282,19 @@ df <- df %>%
          siblings_bin = factor(siblings_bin, levels = c("1. 0 or 1", "2. 2 or more")),
          birth_order = hc64)
 ```
+
+```{r}
+# Remove 'female' variable if it exists
+if ("num_siblings_two_or_more" %in% colnames(df)) {
+  df$num_siblings_two_or_more  <- NULL
+}
+
+df = df %>% 
+  mutate(num_siblings_two_or_more = ifelse(df$siblings_bin == "2. 2 or more", 1, 0)  %>% 
+           as.factor())
+```
+
+
 
 capture drop child_alive 
 gen child_alive =  b5
@@ -1365,6 +1434,20 @@ df <- df %>%
     (b12 >= 24 & b12 <= 400) ~ "0. 24+"
   ))
 ```
+
+```{r}
+# Remove 'pre_birth_interval_less_than_equal_to_24_months' variable if it exists
+if ("pre_birth_interval_less_than_equal_to_24_months" %in% colnames(df)) {
+  df$pre_birth_interval_less_than_equal_to_24_months <- NULL
+}
+
+df <- df %>%
+  mutate(pre_birth_interval_less_than_equal_to_24_months = ifelse(df$pre_birth_interval == "2. < 24 months", 1, 0)  %>% as.factor())
+
+```
+
+
+
 
 capture drop  brothers brothers_count
 gen brothers_count = v202
@@ -1559,6 +1642,21 @@ df <- df %>% mutate(birthweight = case_when(
 ```
 
 
+```{r}
+# Drop variables starting with 'birth_weight_less_than_1800_g', `birth_weight_1800_g_2500_g`
+if ("birth_weight_less_than_1800_g" %in% names(df)) {
+  df <- df %>% select(-starts_with("birth_weight_less_than_1800_g"))
+}
+
+if ("birth_weight_1800_g_2500_g" %in% names(df)) {
+  df <- df %>% select(-starts_with("birth_weight_1800_g_2500_g"))
+}
+
+df <- df %>%
+  mutate(birth_weight_less_than_1800_g = ifelse(df$birthweight == "1. 1800g or less", 1, 0)  %>% as.factor(),
+         birth_weight_1800_g_2500_g = ifelse(df$birthweight == "2. 1801 to 2500g", 1, 0) %>% as.factor())
+```
+
 capture drop multiplet
 recode b0 (10 = 0 "0. no") (1/3 = 1 "1. yes"), gen(multiplet)
 
@@ -1590,7 +1688,7 @@ if ("caste" %in% names(df)) {
 }
 
 # Recode 'sh49' variable into 'caste' variable
-df <- df %>% mutate(caste = case_when(
+df <- df %>% mutate(caste = fct_case_when(
   sh49 == 1 ~ "4. Scheduled Caste",
   sh49 == 2 ~ "3. Scheduled Tribe",
   sh49 == 3 ~ "2. Other backward caste",
@@ -1601,7 +1699,13 @@ df <- df %>% mutate(caste = case_when(
 
 # Replace 'caste' value with 1 if 'sh48' equals 993 or 998
 df <- df %>% mutate(caste = if_else(sh48 %in% c(993, 998), "1. None", caste))
+
 ```
+
+
+
+
+
 
 capture drop religion
 recode v130 (1 4/8 = 1 "1. Hindu+") (2 = 2 "2. muslim")(3 = 3 "3. christian") (9/96 = 4 "4. other"), gen(religion)
@@ -1661,6 +1765,33 @@ df$mother_education <- ifelse(df$v133 == 0, 0,
                                                    )))))
 
 ```
+
+```{r}
+# Drop variables starting with 'maternal_edu_no' 'maternal_edu_1_7' 'maternal_edu_greater_7_10'
+if ("maternal_edu_no" %in% names(df)) {
+  df <- df %>% select(-starts_with("maternal_edu_no"))
+}
+
+if ("maternal_edu_1_7" %in% names(df)) {
+  df <- df %>% select(-starts_with("maternal_edu_1_7"))
+}
+
+if ("maternal_edu_greater_7_10" %in% names(df)) {
+  df <- df %>% select(-starts_with("maternal_edu_greater_7_10"))
+}
+
+
+df <- df %>% 
+  mutate(maternal_edu_no = ifelse(df$v133 == 0, 1, 0) %>% as.factor(),
+         maternal_edu_1_7 = ifelse(df$v133 >= 1 & df$v133 <= 7,
+                              1, 0) %>% as.factor(),
+         maternal_edu_greater_7_10 = ifelse(df$v133 >= 7 & df$v133 <= 10,
+                              1, 0) %>% as.factor())
+
+```
+
+
+
 
 
 capture drop season //designated by India Meteorological Department http://imd.gov.in/section/nhac/wxfaq.pdf
@@ -1862,6 +1993,13 @@ df$focus_states <- case_when(
 )
 ```
 
+```{r}
+df$Northeast_focus <- ifelse(df$focus_states == "1. NE Focus", 1, 0)  %>% as.factor()
+df$Other_Focus <- ifelse(df$focus_states == "2. Other focus", 1, 0)  %>% as.factor()
+```
+
+
+
 capture drop water_home
 gen water_home = .
 replace water_home = 1 if hv204 == 0 | hv204 == 996
@@ -1979,20 +2117,21 @@ replace use_soap = 0 if hv230a < 3
 replace use_soap = 1 if  hv232 == 1
 
 ```{r}
-# remove use_finish if it exists
+# # remove use_finish if it exists
 if ("use_soap" %in% names(df)) {
   df <- df %>% select(-use_soap)
 }
 
-#df$use_soap <- NA
-#df$use_soap <- case_when(
-#    df$hv230a < 3 ~ 0,
-#    df$hv232 == 1 ~ 1,
-#    TRUE ~ NA_real_
-#)
+df$use_soap <- NA
+df$use_soap <- case_when(
+    df$hv230a < 3 & !is.na(df$hv232)  ~ 0,
+    is.na(df$hv230a) & df$hv232 == 1  ~ 1,
+TRUE ~ NA_real_
+)
 
-df$use_soap[df$hv230a < 3] <- 0
-df$use_soap[df$hv232 == 1] <- 1
+df$use_soap <- case_when(is.na(df$use_soap) ~ 1, 
+                         TRUE ~ 0)
+
 ```
 
 capture drop cooking_fuel
@@ -2059,15 +2198,30 @@ replace low_caste = 1 if caste > 1 & caste < 6
 
 
 ```{r}
-# Drop existing variable (if it exists)
-if ("low_caste" %in% names(df)){
-  df$low_caste <- NULL
+# Drop variables starting with 'caste'
+if ("low_caste" %in% names(df)) {
+  df <- df %>% select(-starts_with("low_caste"))
 }
 
 # Replace values based on conditions
-df$low_caste <- ifelse(df$caste == 1, 0, 
-                         ifelse(df$caste > 1 & df$caste < 6, 1, df$low_caste))
+df <- df %>% dplyr::mutate(low_caste = ifelse(caste == "1. None", 0,1) %>% as.factor())
+df <- df
 ```
+
+
+
+```{r}
+df$caste <- df$caste %>% dplyr::recode(`1. None` = 4, 
+                                       `2. Other backward caste` = 3, 
+                                       `3. Scheduled Tribe` = 2,  
+                                       `4. Scheduled Caste` = 1)
+
+```
+
+
+
+
+
 
 
 capture drop toilet
@@ -2085,9 +2239,10 @@ if ("toilet" %in% colnames(df)) {
 df$toilet <- NA
 
 # Replace 'toilet' values based on 'toilet_type'
-df$toilet[df$toilet_type == 0] <- 0
-df$toilet[df$toilet_type == 1 | df$toilet_type == 2] <- 1
+df$toilet[df$toilet_type == "0. no toilet" ] <- 0
+df$toilet[df$toilet_type == "1. flush toilet" | df$toilet_type ==  "2. pit or dry toilet"] <- 1
 ```
+
 
 
 gen m_height = round(maternal_height_cm,1)
@@ -2112,8 +2267,8 @@ if ("iron_3mo" %in% names(df)) {
 
 # Recode 'preg_iron' variable into 'iron_3mo' variable
 df <- df %>% mutate(iron_3mo = case_when(
-  preg_iron %in% c(0, 1, 2) ~ "0. no",
-  preg_iron %in% c(3, 4) ~ "1. yes",
+  preg_iron %in% c("0", "1. 1 mo or less", "2. 1-3 mo") ~ "0. no",
+  preg_iron %in% c("3. 3-6 mo", "4. 6+ mo") ~ "1. yes",
   TRUE ~ NA_character_ # all other cases
 ))
 ```
@@ -2140,8 +2295,8 @@ if ("anc_4visits" %in% names(df)) {
 
 # Recode 'anc_visits' variable into 'anc_4visits' variable
 df <- df %>% mutate(anc_4visits = case_when(
-  anc_visits %in% c(0, 1) ~ "0. no",
-  anc_visits == 2 ~ "1. yes",
+  anc_visits %in% c("0. no visits", "1. 1-3 visits") ~ "0. no",
+  anc_visits == "2. 4 or more visits" ~ "1. yes",
   TRUE ~ NA_character_ # all other cases
 ))
 
@@ -2170,10 +2325,11 @@ df$m_ht <- ifelse(df$maternal_height_cm >= 157.5 & !is.na(df$maternal_height_cm)
                          ifelse(df$maternal_height_cm < 147.3, 3, df$m_ht)))
 
 # Add labels to m_ht
-labels <- c("1 5feet2 or higher", "4feet8 to 5feet2", "less than 4feet8")
+labels <- c("1. 5feet2 or higher", "2. 4feet8 to 5feet2", "3. less than 4feet8")
 levels <- c(1, 2, 3)
 df$m_ht <- factor(df$m_ht, levels = levels, labels = labels)
 ```
+
 
 gen sibs = cond(siblings >= 3 & siblings ~=.,1,0,0) 
 label define house_finish 0  "0. no concrete material" 1  "1. some concrete material" 2  "2. all concrete"
@@ -2182,9 +2338,12 @@ label define maternal_education 0  "no edu" 1  "primary" 2  "secondary" 3  "high
 label value maternal_education maternal_education
 
 ```{r}
+num_siblings = c("3. 3", "4. 4 or more")
+
+
 # Create 'sibs' variable
 df <- df %>% mutate(sibs = case_when(
-  siblings >= 3 & !is.na(siblings) ~ 1,
+  siblings %in% num_siblings  ~ 1,
   TRUE ~ 0 # all other cases
 ))
 
@@ -2196,6 +2355,12 @@ df$house_finish <- factor(df$house_finish, levels = c(0, 1, 2),
 df$maternal_education <- factor(df$maternal_education, levels = c(0, 1, 2, 3),
                                 labels = c("no edu", "primary", "secondary", "high secondary or college"))
 ```
+
+```{r}
+df$house_partially_finished_no <- ifelse(df$house_finish != "1. some concrete material", 1, 0)  %>% as.factor()
+```
+
+
 
 capture drop mother_agecat
 recode v013 (1/2 = 1 "1. <25")(3/4 = 2 "25-34")(5/7 = 3 "35+"), gen(mother_agecat)
@@ -2233,9 +2398,9 @@ if("scale_ciaf1_house" %in% names(df)) {
 df$scale_ciaf1_house <- NA
 
 # Assign values to scale_ciaf1_house based on house_finish
-df$scale_ciaf1_house <- ifelse(df$house_finish == 2, 0,
-                               ifelse(df$house_finish == 1, 3,
-                                      ifelse(df$house_finish == 0, 4.5, df$scale_ciaf1_house)))
+df$scale_ciaf1_house <- ifelse(df$house_finish == "2. all concrete", 0,
+                               ifelse(df$house_finish == "1. some concrete material", 3,
+                                      ifelse(df$house_finish == "0. no concrete material", 4.5, df$scale_ciaf1_house)))
 ```
 
 capture drop scale_ciaf1_mheight
@@ -2254,9 +2419,9 @@ if("scale_ciaf1_mheight" %in% names(df)) {
 df$scale_ciaf1_mheight <- NA
 
 # Assign values to scale_ciaf1_mheight based on m_ht
-df$scale_ciaf1_mheight <- ifelse(df$m_ht == 1, 0,
-                                 ifelse(df$m_ht == 2, 4,
-                                        ifelse(df$m_ht == 3, 8, df$scale_ciaf1_mheight)))
+df$scale_ciaf1_mheight <- ifelse(df$m_ht == "1. 5feet2 or higher", 0,
+                                 ifelse(df$m_ht == "2. 4feet8 to 5feet2", 4,
+                                        ifelse(df$m_ht == "3. less than 4feet8", 8, df$scale_ciaf1_mheight)))
 ```
 
 capture drop scale_ciaf1_medu
@@ -2276,10 +2441,10 @@ if("scale_ciaf1_medu" %in% names(df)) {
 df$scale_ciaf1_medu <- NA
 
 # Assign values to scale_ciaf1_medu based on maternal_education
-df$scale_ciaf1_medu <- ifelse(df$maternal_education == 3, 0,
-                              ifelse(df$maternal_education == 2, 2,
-                                     ifelse(df$maternal_education == 1, 3.5,
-                                            ifelse(df$maternal_education == 0, 5, df$scale_ciaf1_medu))))
+df$scale_ciaf1_medu <- ifelse(df$maternal_education == "high secondary or college", 0,
+                              ifelse(df$maternal_education == "secondary", 2,
+                                     ifelse(df$maternal_education == "primary", 3.5,
+                                            ifelse(df$maternal_education == "no edu", 5, df$scale_ciaf1_medu))))
 ```
 
 capture drop scale_ciaf1_toilet
@@ -2317,10 +2482,10 @@ if("scale_ciaf1_zone" %in% names(df)) {
 df$scale_ciaf1_zone <- NA
 
 # Assign values to scale_ciaf1_zone based on state_zones
-df$scale_ciaf1_zone <- ifelse(df$state_zones == 1, 0,
-                              ifelse(df$state_zones %in% c(2, 3), 2.5,
-                                     ifelse(df$state_zones %in% c(4, 6), 2,
-                                            ifelse(df$state_zones == 5, 5, df$scale_ciaf1_zone))))
+df$scale_ciaf1_zone <- ifelse(df$state_zones == "1. North-Eastern", 0,
+                              ifelse(df$state_zones %in% c("2. North", "3. Central"), 2.5,
+                                     ifelse(df$state_zones %in% c("4. Eastern", "6. Southern"), 2,
+                                            ifelse(df$state_zones == "5. Western", 5, df$scale_ciaf1_zone))))
 ```
 
 capture drop scale_ciaf1_fuel
@@ -2357,8 +2522,8 @@ if("scale_ciaf1_female" %in% names(df)) {
 df$scale_ciaf1_female <- NA
 
 # Assign values to scale_ciaf1_female based on female
-df$scale_ciaf1_female <- ifelse(df$female == 1, 0,
-                                ifelse(df$female == 0, 1, df$scale_ciaf1_female))
+df$scale_ciaf1_female <- ifelse(df$female == "1. female", 0,
+                                ifelse(df$female == "0. male", 1, df$scale_ciaf1_female))
 ```
 
 capture drop scale_ciaf1_caste
@@ -2454,6 +2619,15 @@ df$ciaf_decile <- cut(df$dist_ciaf_decile,
                       labels = c("< 30%", "40%", "50%", "60%", "70%", "80%", "> 80%"))
 ```
 
+```{r}
+df$mean_district_CIAF_40_49.9 <- ifelse(df$ciaf_decile == "40%", 1, 0)  %>% as.factor()
+df$mean_district_CIAF_50_59.9 <- ifelse(df$ciaf_decile == "50%", 1, 0)  %>% as.factor()
+df$mean_district_CIAF_60_69.9 <- ifelse(df$ciaf_decile == "60%", 1, 0)  %>% as.factor()
+df$mean_district_CIAF_70_79.9 <- ifelse(df$ciaf_decile == "70%", 1, 0) %>% as.factor()
+df$mean_district_CIAF_80_89.9 <- ifelse(df$ciaf_decile == "80%", 1, 0) %>% as.factor()
+```
+
+
 capture dist_wasted_mean
 by shdistri, sort : egen float dist_wasted_mean = mean(wasted)
 capture drop mean_wasted_dist
@@ -2485,31 +2659,9 @@ df$wasted_decile <- cut(df$dist_wasted_decile,
                         labels = c("0-10%", "10-20%", "20-30%", "30-40%", "40-50%", "50-60%"),
                         right = FALSE)
 
-
-#df <- df %>% 
-#  group_by(shdist) %>% 
-#  mutate(dist_wasted_mean = mean(wasted)) %>% 
-#  ungroup() %>% 
-#  mutate(mean_wasted_dist = case_when(
-#           dist_wasted_mean <= 0.399999 ~ "1. < 40%",
-#           dist_wasted_mean <= 0.6 & dist_wasted_mean > 0.399999 ~ "2. 40-60%",
-#           dist_wasted_mean > 0.6 ~ "3. > 60%"
-#         ),
-#         dist_wasted_decile = round(dist_wasted_mean, 0.1),
-#         wasted_decile = case_when(
-#           dist_wasted_decile == 0 ~ "0-10%",
-#           dist_wasted_decile == 0.1 ~ "10-20%",
-#           dist_wasted_decile == 0.2 ~ "20-30%",
-#           dist_wasted_decile == 0.3 ~ "30-40%",
-#           dist_wasted_decile == 0.4 ~ "40-50%",
-#           dist_wasted_decile == 0.5 ~ "50-60%",
-#           TRUE ~ ""
-#         )) 
 ```
 
-```{r}
-df$state
-```
+
 
 capture drop priority_district 
 capture drop dist_priority
@@ -2549,6 +2701,12 @@ if ('priority_district' %in% colnames(df)) {
 ```{r}
 rev(colnames(df))
 ```
+
+## Convert ciaf into a factor
+```{r}
+df$ciaf <- df$ciaf %>% as.factor()
+```
+
 
 ```{r}
 path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"

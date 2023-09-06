@@ -1,13 +1,13 @@
 ---
-title: "Perm original model validation"
+title: "3.5-validation_NA_imputation"
+author: "Justin Guerra"
+date: "2023-09-06"
 output: html_document
-date: "2023-03-21"
 ---
 
-From Stata to R
-https://fsolt.org/blog/posts/switch-to-r/
-https://epi-stats.github.io/Rtutorials/Stata_to_R#recode
-https://www.techtips.surveydesign.com.au/post/the-recode-command
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 
 ```{r setup, include=FALSE}
@@ -27,9 +27,10 @@ source('./mdl-evaluation.R')
 
 ```{r}
 path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/recoded.rda"
-#path <- "data/DHS-2019-21/"
+# #path <- "data/DHS-2019-21/"
+datafile <- "recoded.rda"
+load(file = "/Users/justi/OneDrive/Desktop/colabo_data/data/recoded.rda")
 
-load(file = path)
 ```
 
 
@@ -87,10 +88,29 @@ model_coeffs <- c(intercept = -1.62,
 
 df_model <- df[, model_vars] 
 
-df_model_nona <- na.omit(df_model) %>%
-  dplyr::mutate_if(is.factor, as.character) %>% #Change from factor to character (some reason converting 0s and 1s to 1s and 2s)
-   dplyr::mutate_if(is.character, as.integer) #Change from character to integer
 ```
+
+```{r}
+df_model %>% is.na() %>% colSums()
+```
+
+
+
+```{r}
+df_modelFactor = df_model %>% mutate_if(is.integer, as.factor) 
+df_imp <- mice(df_modelFactor,
+     m = 3,
+     maxit = 3, method = c("logreg", "logreg", "","", "","","logreg","logreg", "logreg","logreg", "logreg", "logreg", "","logreg", "logreg","","","","", "","","","","logreg"))
+
+```
+```{r}
+df_modelImpNumeric <- complete(df_imp,3) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  mutate_if(is.character, as.integer)
+
+df_modelImpNumeric
+```
+
 
 
 ```{r}
@@ -118,7 +138,7 @@ calc_pred_probs <- function(log_odds) {
 
 
 ```{r}
-data0 <- df_model_nona
+data0 <- df_modelImpNumeric
 pred0 <- calc_log_odds(model_coeffs, data0)
 prob0 <- calc_pred_probs(pred0)
 ```
@@ -126,25 +146,21 @@ prob0 <- calc_pred_probs(pred0)
 
 
 ```{r}
-#mdl_folder0 = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/"
-mdl_folder0 = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/"
-#mdl_folder0 <- "data/DHS-2019-21/orig-model-validation"
-dir.create(mdl_folder0)
+mdl_folderImp = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/mdl_validationImputation/"
+dir.create(mdl_folderImp)
 
 
 # Generate the data frame with the data needed for the calibration and ROC plots
-plot_data0 <- data.frame(out = data0$ciaf, logodds = pred0, prob = prob0)
+plot_dataImp <- data.frame(out = data0$ciaf, logodds = pred0, prob = prob0)
 
-cal_plot(base_model, plot_data0, "prob", model_label = '', dir = mdl_folder0, fn = "cal_plot.pdf")
-cal_c0 <- cal_coeff(plot_data0, "prob", mdl_folder0, "cal_plot_coefficients.txt")
+cal_plot(base_model,plot_dataImp, "prob", model_label = '', dir = mdl_folderImp, fn = "cal_plotImputed.pdf")
+cal_c0 <- cal_coeff(plot_dataImp, "prob", mdl_folderImp, "cal_plot_coefficientsImputed.txt")
 print(cal_c0)
 
-roc_plot(data0$ciaf, prob0, dir = mdl_folder0, fn = "roc_plot.pdf")
-```
-```{r}
-plot_roc_perf(plot_data0$out, plot_data0$prob)
+roc_plot(data0$ciaf, prob0, dir = mdl_folderImp, fn = "roc_plotImputed.pdf")
 ```
 
 ```{r}
-conf_matrix(plot_data0$out, plot_data0$prob, 0.5, mdl_folder0, "conf_matrix.txt")
+conf_matrix(plot_dataImp$out, plot_dataImp$prob, 0.5, mdl_folderImp, "conf_matrixImp.txt")
 ```
+
