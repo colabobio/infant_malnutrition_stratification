@@ -325,6 +325,9 @@ df$underweight[df$waz < -2] <- 1
 
 # Replace missing values with 0 if waz >= -2 and not missing
 df$underweight[df$waz >= -2 & !is.na(df$waz)] <- 0
+
+# Convert to factor
+df$underweight <- as.factor(df$underweight)
 ```
 
 capture drop o_underweight
@@ -364,6 +367,9 @@ df$wasted[df$whz < -2] <- 1
 
 # Replace missing values with 0 if whz >= -2 and not missing
 df$wasted[df$whz >= -2 & !is.na(df$haz)] <- 0
+
+#Convert to factor
+df$wasted <- as.factor(df$wasted)
 ```
 
 capture drop o_wasted
@@ -404,7 +410,6 @@ df$ciaf[df$stunted == 1 | df$wasted == 1 | df$underweight == 1] <- 1
 # Replace missing values with NA
 df$ciaf[is.na(df$stunted) | is.na(df$wasted) | is.na(df$underweight)] <- NA
 
-
 ```
 
 capture drop stunt_waste
@@ -426,6 +431,9 @@ df$stunt_waste[df$stunted == 1 & df$wasted == 1] <- 1
 
 # Replace missing values with NA
 df$stunt_waste[is.na(df$stunted) | is.na(df$wasted)] <- NA
+
+# Convert to factor
+df$stunt_waste <- as.factor(df$stunt_waste)
 ```
 
 
@@ -444,6 +452,9 @@ df$elig <- 0
 
 # Replace values with 1 if bidx is 1
 df$elig[df$bidx == 1] <- 1
+
+#Convert to factor
+df$elig <- as.factor(df$elig)
 ```
 
 *** Predictors ***
@@ -479,7 +490,6 @@ df <- df %>%
 # Create a new variable maternal_height_cm and recode it into maternal_height
 df <- df %>%
   mutate(maternal_height_cm = v438 / 10) %>%
-  replace_na(list(maternal_height_cm = NA)) %>%
   mutate(maternal_height_cm = ifelse(maternal_height_cm > 999, NA, maternal_height_cm)) %>%
   mutate(maternal_height = fct_case_when(
     maternal_height_cm >= 160 & maternal_height_cm <= 210   ~ "1. 160+ cm",
@@ -517,7 +527,6 @@ df <- df %>%
 # Create a new variable maternal_bmi_value and recode it into maternal_bmi
 df <- df %>%
   mutate(maternal_bmi_value = v445 / 100) %>%
-  replace_na(list(maternal_bmi_value = NA)) %>%
   mutate(maternal_bmi_value = ifelse(maternal_bmi_value > 80, NA, maternal_bmi_value)) %>%
   mutate(maternal_bmi = fct_case_when(
     maternal_bmi_value >= 0   & maternal_bmi_value < 18.5  ~ "1. < 18.5",
@@ -543,7 +552,6 @@ df <- df %>%
 # Create a new variable paternal_height_cm and recode it into paternal_height
 df <- df %>%
   mutate(paternal_height_cm = hb3 / 10) %>%
-  replace_na(list(paternal_height_cm = NA)) %>%
   mutate(paternal_height_cm = ifelse(paternal_height_cm > 999, NA, paternal_height_cm)) %>%
   mutate(paternal_height = case_when(
     paternal_height_cm >= 160 & paternal_height_cm <= 230   ~ "1. 160+ cm",
@@ -576,7 +584,6 @@ df <- df %>%
 # Create a new variable paternal_bmi_value and recode it into paternal_bmi
 df <- df %>%
   mutate(paternal_bmi_value = hb40 / 100) %>%
-  replace_na(list(paternal_bmi_value = NA)) %>%
   mutate(paternal_bmi_value = ifelse(paternal_bmi_value > 80, NA, paternal_bmi_value)) %>%
   mutate(paternal_bmi = fct_case_when(
     paternal_bmi_value >= 0   & paternal_bmi_value < 18.5  ~ "1. < 18.5",
@@ -681,6 +688,8 @@ if ("still_breastfed" %in% colnames(df)) {
 # Create the new variable still_breastfed based on the given conditions
 df <- df %>%
   mutate(still_breastfed = if_else(m4 == 95, 1, if_else(m4 != 95 & child_age <= 60, 0, NA_real_)))
+
+df$still_breastfed <- as.factor(df$still_breastfed)
 ```
 
 capture drop icfi_breastmilk
@@ -695,14 +704,22 @@ if ("icfi_breastmilk_score" %in% colnames(df)) {
   df$icfi_breastmilk_score <- NULL
 }
 
-# Create the new variable icfi_breastmilk_score based on the given conditions
-df <- df %>%
-  mutate(icfi_breastmilk_score = fct_case_when(
-    child_age >= 6 & child_age <= 60 ~ 0,
-    still_breastfed == 1 & child_age >= 6 & child_age <= 12 ~ 2,
-    still_breastfed == 1 & child_age > 12 & child_age <= 60 ~ 1,
-    TRUE ~ NA_real_
-  ))
+# # Create the new variable icfi_breastmilk_score based on the given conditions
+# df <- df %>%
+#   mutate(icfi_breastmilk_score = case_when(
+#     child_age >= 6 & child_age <= 60 ~ 0,
+#     still_breastfed == 1 & child_age >= 6 & child_age <= 12 ~ 2,
+#     still_breastfed == 1 & child_age > 12 & child_age <= 60 ~ 1,
+#     TRUE ~ NA_real_
+#   ))
+
+df$icfi_breastmilk_score[df$child_age >= 6 & df$child_age <= 60 & is.na(df$still_breastfed)] <- 0
+
+df$icfi_breastmilk_score[df$still_breastfed == 1 & df$child_age >= 6 & df$child_age <= 12] <- 2
+
+df$icfi_breastmilk_score[df$still_breastfed == 1 & df$child_age > 12 & df$child_age <= 60] <- 1
+
+df$icfi_breastmilk_score <- as.factor(df$icfi_breastmilk_score)
 ```
 
 capture drop icfi_bottlefeed 
@@ -717,9 +734,14 @@ if ("icfi_bottlefeed_score" %in% colnames(df)) {
 }
 
 # Create the new variable icfi_bottlefeed_score based on the given conditions
-df <- df %>%
-  mutate(icfi_bottlefeed_score = if_else(child_age >= 6 & child_age <= 60 & m38 == 0, 1,
-                                         if_else(child_age >= 6 & child_age <= 60 & m38 == 1, 0, NA_real_)))
+# df <- df %>%
+#   mutate(icfi_bottlefeed_score = if_else(child_age >= 6 & child_age <= 60 & m38 == 0, 1,
+#                                          if_else(child_age >= 6 & child_age <= 60 & m38 == 1, 0, NA_real_)))
+
+df$icfi_bottlefeed_score[df$child_age >= 6 & df$child_age <= 60 & df$m38 == 0] <- 1
+df$icfi_bottlefeed_score[df$child_age >= 6 & df$child_age <= 60 & df$m38 == 1] <- 0
+
+df$icfi_bottlefeed_score <- df$icfi_bottlefeed_score %>% as.factor()
 ```
 
 capture drop icfi_starchy_staples_score 
@@ -733,10 +755,16 @@ if ("icfi_starchy_staples_score" %in% colnames(df)) {
   df$icfi_starchy_staples_score <- NULL
 }
 
-# Create the new variable icfi_starchy_staples_score based on the given conditions
-df <- df %>%
-  mutate(icfi_starchy_staples_score = if_else(child_age >= 6 & child_age <= 24, 0,
-                                              if_else((v412a == 1 | v412b == 1 | v414e == 1 | v414f == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+# # Create the new variable icfi_starchy_staples_score based on the given conditions
+# df <- df %>%
+#   mutate(icfi_starchy_staples_score = if_else(child_age >= 6 & child_age <= 24, 0,
+#                                               if_else((v412a == 1 | v412b == 1 | v414e == 1 | v414f == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+
+
+df$icfi_starchy_staples_score[df$child_age >= 6 & df$child_age <= 24] <- 0
+df$icfi_starchy_staples_score[(df$v412a == 1 | df$v412b == 1 | df$v414e == 1 | df$v414f == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
+
+df$icfi_starchy_staples_score <- df$icfi_starchy_staples_score %>% as.factor()
 ```
 
 capture drop icfi_lentils_score
@@ -751,9 +779,14 @@ if ("icfi_lentils_score" %in% colnames(df)) {
 }
 
 # Create the new variable icfi_lentils_score based on the given conditions
-df <- df %>%
-  mutate(icfi_lentils_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                      if_else(v414o == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+# df <- df %>%
+#   mutate(icfi_lentils_score = if_else(child_age >= 6 & child_age <= 60, 0,
+#                                       if_else(v414o == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+
+df$icfi_lentils_score[df$child_age >= 6 & df$child_age <= 60] <- 0
+df$icfi_lentils_score[df$v414o == 1 & df$child_age >= 6 & df$child_age <= 60] <- 1
+
+df$icfi_lentils_score <- df$icfi_lentils_score %>% as.factor()
 ```
 
 
@@ -768,10 +801,15 @@ if ("icfi_milk_score" %in% colnames(df)) {
   df$icfi_milk_score <- NULL
 }
 
-# Create the new variable icfi_milk_score based on the given conditions
-df <- df %>%
-  mutate(icfi_milk_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                   if_else(v411 == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+# # Create the new variable icfi_milk_score based on the given conditions
+# df <- df %>%
+#   mutate(icfi_milk_score = if_else(child_age >= 6 & child_age <= 60, 0,
+#                                    if_else(v411 == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+
+df$icfi_milk_score[df$child_age >= 6 & df$child_age <= 60] <- 0
+df$icfi_milk_score[df$v411 == 1 & df$child_age >= 6 & df$child_age <= 60] <- 1
+
+df$icfi_milk_score <- as.factor(df$icfi_milk_score)
 ```
 
 capture drop icfi_dairy_score
@@ -785,10 +823,15 @@ if ("icfi_dairy_score" %in% colnames(df)) {
   df$icfi_dairy_score <- NULL
 }
 
-# Create the new variable icfi_dairy_score based on the given conditions
-df <- df %>%
-  mutate(icfi_dairy_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                    if_else((v414p == 1 | v414q == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+# # Create the new variable icfi_dairy_score based on the given conditions
+# df <- df %>%
+#   mutate(icfi_dairy_score = if_else(child_age >= 6 & child_age <= 60, 0,
+#                                     if_else((v414p == 1 | v414q == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+
+df$icfi_dairy_score[df$child_age >= 6 & df$child_age <= 60] <- 0
+df$icfi_dairy_score[(df$v414p == 1 | df$v414q == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
+
+df$icfi_dairy_score <- df$icfi_dairy_score %>% as.factor()
 ```
 
 
@@ -803,10 +846,15 @@ if ("icfi_meat_score" %in% colnames(df)) {
   df$icfi_meat_score <- NULL
 }
 
-# Create the new variable icfi_meat_score based on the given conditions
-df <- df %>%
-  mutate(icfi_meat_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                   if_else((v414a == 1 | v414m == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+# # Create the new variable icfi_meat_score based on the given conditions
+# df <- df %>%
+#   mutate(icfi_meat_score = if_else(child_age >= 6 & child_age <= 60, 0,
+#                                    if_else((v414a == 1 | v414m == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+
+df$icfi_meat_score[df$child_age >= 6 & df$child_age <= 60] <- 0
+df$icfi_meat_score[(df$v414a == 1 | df$v414m == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
+
+df$icfi_meat_score <- as.factor(df$icfi_meat_score)
 ```
 
 capture drop icfi_eggs_fish_score
@@ -821,11 +869,22 @@ if ("icfi_eggs_fish_score" %in% colnames(df)) {
   df$icfi_eggs_fish_score <- NULL
 }
 
-# Create the new variable icfi_eggs_fish_score based on the given conditions
-df <- df %>%
-  mutate(icfi_eggs_fish_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                        if_else((v414g == 1 | v414n == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_))) %>%
-  mutate(icfi_meat_score = if_else(icfi_eggs_fish_score == 1, 1, icfi_meat_score))
+# # Create the new variable icfi_eggs_fish_score based on the given conditions
+# df <- df %>%
+#   mutate(icfi_eggs_fish_score = if_else(child_age >= 6 & child_age <= 60, 0,
+#                                         if_else((v414g == 1 | v414n == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_))) %>%
+#   mutate(icfi_meat_score = if_else(icfi_eggs_fish_score == 1, 1, icfi_meat_score))
+
+df$icfi_eggs_fish_score[df$child_age >= 6 & df$child_age <= 60] <- 0
+df$icfi_eggs_fish_score[(df$v414g == 1 | df$v414n == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
+
+# Ensure `icfi_meat_score` is initialized in df
+df$icfi_meat_score <- ifelse(is.na(df$icfi_meat_score), NA, df$icfi_meat_score)
+
+# Update `icfi_meat_score` based on `icfi_eggs_fish_score`
+df$icfi_meat_score[df$icfi_eggs_fish_score == 1] <- 1
+
+df$icfi_eggs_fish_score <- as.factor(df$icfi_eggs_fish_score)
 ```
 
 capture drop icfi_vitA_score
@@ -839,10 +898,15 @@ if ("icfi_vitA_score" %in% colnames(df)) {
   df$icfi_vitA_score <- NULL
 }
 
-# Create the new variable icfi_vitA_score based on the given conditions
-df <- df %>%
-  mutate(icfi_vitA_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                   if_else((v414i == 1 | v414j == 1 | v414k == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+# # Create the new variable icfi_vitA_score based on the given conditions
+# df <- df %>%
+#   mutate(icfi_vitA_score = if_else(child_age >= 6 & child_age <= 60, 0,
+#                                    if_else((v414i == 1 | v414j == 1 | v414k == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+
+df$icfi_vitA_score[df$child_age >= 6 & df$child_age <= 60] <- 0
+df$icfi_vitA_score[(df$v414i == 1 | df$v414j == 1 | df$v414k == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
+
+df$icfi_vitA_score <- as.factor(df$icfi_vitA_score)
 ```
 
 capture drop icfi_other_fruits_score
@@ -857,9 +921,14 @@ if ("icfi_other_fruits_score" %in% colnames(df)) {
 }
 
 # Create the new variable icfi_other_fruits_score based on the given conditions
-df <- df %>%
-  mutate(icfi_other_fruits_score = if_else(child_age >= 6 & child_age <= 60, 0,
-                                           if_else(v414l == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+# df <- df %>%
+#   mutate(icfi_other_fruits_score = if_else(child_age >= 6 & child_age <= 60, 0,
+#                                            if_else(v414l == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
+
+df$icfi_other_fruits_score[df$child_age >= 6 & df$child_age <= 60] <- 0
+df$icfi_other_fruits_score[df$v414l == 1 & df$child_age >= 6 & df$child_age <= 60] <- 1
+
+df$icfi_other_fruits_score <- as.factor(df$icfi_other_fruits_score)
 ```
 
 
@@ -908,8 +977,7 @@ xtile dd_quintile = dietary_diversity_score if child_age > = 6 & elig == 1, nq(4
 df  <- df %>%
   filter(child_age >= 6, elig == 1) %>% # Filter the df
   mutate(dd_quintile = ntile(dietary_diversity_score, 4)) %>% # Create the quintiles
-  ungroup() %>% # Remove grouping
-  replace_na(list(dd_quintile = 0)) # Replace missing values in 'dd_quintile' with 0
+  ungroup() 
 ```
 
 capture drop bf_start
@@ -1034,8 +1102,6 @@ df$toilet_type[df$child_age > 60] <- NA_character_
 
 df$toliet_access_no <- ifelse(df$toilet_type == "0. no toilet", 1,0)  %>% as.factor()
 
-df$toliet_access_no
-
 ```
 
 
@@ -1107,6 +1173,8 @@ if ("kitchen" %in% colnames(df)) {
 df <- df %>%
   mutate(kitchen = hv242) %>%
   mutate(kitchen = ifelse(hv241 == 2 | hv241 == 3, 1, kitchen))
+
+df$kitchen <- as.factor(df$kitchen)
 ```
 
 
@@ -1163,6 +1231,8 @@ df <- df %>%
   mutate(vitamin_a = NA) %>%
   mutate(vitamin_a = ifelse(h34 == 0, 0, vitamin_a)) %>%
   mutate(vitamin_a = ifelse(h34 == 1, 1, vitamin_a))
+
+df$vitamin_a <- as.factor(df$vitamin_a)
 ```
 
 ren hw57 child_anemia
@@ -1170,7 +1240,9 @@ ren hw57 child_anemia
 ```{r}
 # Rename 'hw57' variable to 'child_anemia'
 df <- df %>%
-  rename(child_anemia = hw57)
+  rename(child_anemia = hw57) 
+
+df$child_anemia <- as.factor(df$child_anemia)
 ```
 
 capture drop full_vaccination
@@ -1194,6 +1266,8 @@ df <- df %>%
                                       !is.na(h6) & !is.na(h7) & !is.na(h8) & !is.na(h9), 0, full_vaccination)) %>%
   mutate(full_vaccination = ifelse((h2 %in% 1:3) & (h3 %in% 1:3) & (h4 %in% 1:3) & (h5 %in% 1:3) &
                                       (h6 %in% 1:3) & (h7 %in% 1:3) & (h8 %in% 1:3) & (h9 %in% 1:3), 1, full_vaccination))
+
+df$full_vaccination <- as.factor(df$full_vaccination)
 ```
 
 capture drop female
@@ -1308,6 +1382,8 @@ if ("child_alive" %in% colnames(df)) {
 # Create 'child_alive' variable based on 'b5'
 df <- df %>%
   mutate(child_alive = b5)
+
+df$child_alive <- as.factor(df$child_alive)
 ```
 
 
@@ -1580,6 +1656,8 @@ df <- df  %>%
                                  h31 == 2 ~ 1, 
                                  TRUE ~ NA_real_))
 
+df$child_cough <- as.factor(df$child_cough)
+
 ```
 
 capture drop child_fever
@@ -1598,7 +1676,6 @@ df <- df %>% mutate(child_fever = case_when(
   h22 == 8 ~ NA_character_, # missing
   TRUE ~ NA_character_ # all other cases
 ))
-
 ```
 
 
@@ -1870,6 +1947,8 @@ df$covariate_nonmissing <- ifelse(
   !is.na(df$full_vaccination) & !is.na(df$vitamin_a),
   1, df$covariate_nonmissing
 )
+
+df$covariate_nonmissing <- df$covariate_nonmissing %>% as.factor()
 ```
 
 
@@ -2122,16 +2201,21 @@ if ("use_soap" %in% names(df)) {
   df <- df %>% select(-use_soap)
 }
 
-df$use_soap <- NA
-df$use_soap <- case_when(
-    df$hv230a < 3 & !is.na(df$hv232)  ~ 0,
-    is.na(df$hv230a) & df$hv232 == 1  ~ 1,
-TRUE ~ NA_real_
-)
+# df$hv232 <- as.numeric(df$hv232)
+# 
+# df$use_soap <- NA
+# df$use_soap <- case_when(
+#     df$hv230a < 3 & !is.na(df$hv232)  ~ 0,
+#     is.na(df$hv230a) & df$hv232 == 1  ~ 1,
+# TRUE ~ NA_real_
+# )
+# 
+# df$use_soap <- case_when(is.na(df$use_soap)  ~ 1,
+#                          TRUE ~ 0) %>% as.factor()
 
-df$use_soap <- case_when(is.na(df$use_soap) ~ 1, 
-                         TRUE ~ 0)
-
+df$use_soap[df$hv230a < 3] <- 0
+df$use_soap[df$hv232 == 1] <- 1
+df$use_soap <- df$use_soap %>% as.factor()
 ```
 
 capture drop cooking_fuel
@@ -2189,6 +2273,7 @@ if ("christian" %in% names(df)) {
 }
 
 df$christian <- ifelse(df$religion == 3, 1, 0)
+df$christian <- as.factor(df$christian)
 ```
 
 capture drop low_caste
@@ -2205,16 +2290,16 @@ if ("low_caste" %in% names(df)) {
 
 # Replace values based on conditions
 df <- df %>% dplyr::mutate(low_caste = ifelse(caste == "1. None", 0,1) %>% as.factor())
-df <- df
+df$low_caste <- df$low_caste %>% as.factor()
 ```
 
 
 
 ```{r}
-df$caste <- df$caste %>% dplyr::recode(`1. None` = 4, 
-                                       `2. Other backward caste` = 3, 
-                                       `3. Scheduled Tribe` = 2,  
-                                       `4. Scheduled Caste` = 1)
+# df <- df %>% dplyr::mutate(caste = case_when(df$caste == `1. None` ~ 4, 
+#                                        `2. Other backward caste` ~ 3, 
+#                                        `3. Scheduled Tribe` ~ 2,  
+#                                        `4. Scheduled Caste` 1))
 
 ```
 
@@ -2241,6 +2326,8 @@ df$toilet <- NA
 # Replace 'toilet' values based on 'toilet_type'
 df$toilet[df$toilet_type == "0. no toilet" ] <- 0
 df$toilet[df$toilet_type == "1. flush toilet" | df$toilet_type ==  "2. pit or dry toilet"] <- 1
+
+df$toilet <- as.factor(df$toilet)
 ```
 
 
@@ -2401,6 +2488,7 @@ df$scale_ciaf1_house <- NA
 df$scale_ciaf1_house <- ifelse(df$house_finish == "2. all concrete", 0,
                                ifelse(df$house_finish == "1. some concrete material", 3,
                                       ifelse(df$house_finish == "0. no concrete material", 4.5, df$scale_ciaf1_house)))
+
 ```
 
 capture drop scale_ciaf1_mheight
@@ -2625,6 +2713,9 @@ df$mean_district_CIAF_50_59.9 <- ifelse(df$ciaf_decile == "50%", 1, 0)  %>% as.f
 df$mean_district_CIAF_60_69.9 <- ifelse(df$ciaf_decile == "60%", 1, 0)  %>% as.factor()
 df$mean_district_CIAF_70_79.9 <- ifelse(df$ciaf_decile == "70%", 1, 0) %>% as.factor()
 df$mean_district_CIAF_80_89.9 <- ifelse(df$ciaf_decile == "80%", 1, 0) %>% as.factor()
+
+# Convert to factor
+df$ciaf <- as.factor(df$ciaf)
 ```
 
 
@@ -2701,12 +2792,6 @@ if ('priority_district' %in% colnames(df)) {
 ```{r}
 rev(colnames(df))
 ```
-
-## Convert ciaf into a factor
-```{r}
-df$ciaf <- df$ciaf %>% as.factor()
-```
-
 
 ```{r}
 path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"

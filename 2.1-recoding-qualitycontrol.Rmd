@@ -89,3 +89,6 @@ write.table(all_NA_vars,
             col.names = FALSE)
 ```
 
+
+
+

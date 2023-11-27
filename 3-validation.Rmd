@@ -94,6 +94,12 @@ df_model_nona <- na.omit(df_model) %>%
 
 
 ```{r}
+# Umap_dfmodel_nona = umap::umap(d = df_model_nona)
+```
+
+
+
+```{r}
 # Function to calculate the predicted the log odds (linear term of the model)
 calc_log_odds <- function(coefficients, data) {
   # Extract the intercept from the coefficients
