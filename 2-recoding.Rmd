@@ -457,6 +457,8 @@ df$elig[df$bidx == 1] <- 1
 df$elig <- as.factor(df$elig)
 ```
 
+
+
 *** Predictors ***
 
 capture drop wealth_quintile 
@@ -2729,6 +2731,11 @@ recode dist_wasted_decile (0 = 0 "0-10%")(0.1 = 1 "10-20%")(.2 = 2 "20-30%")(0.3
 , gen(wasted_decile)
 
 ```{r}
+df <- df %>% 
+  mutate(wasted = as.integer(wasted)) %>%
+  mutate(wasted = case_when(wasted == 1 ~ 0,
+                            wasted == 2 ~ 1))
+
 # Calculate the mean 'wasted' by 'shdist' and create a new column 'dist_wasted_mean'
 df <- df %>%
   group_by(shdist) %>%

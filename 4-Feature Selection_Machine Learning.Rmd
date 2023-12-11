@@ -67,28 +67,46 @@ onehot_encoding
 ```{r}
 NA_OHE_vars = onehot_encoding %>% colnames() %>% str_subset(pattern = "_NA$")
 onehot_encoding_noNAs = onehot_encoding %>% dplyr::select(-c(NA_OHE_vars, "ciaf_0"))
-```
-```{r}
-# #make this example reproducible
-# set.seed(1)
-# 
-# #use 70% of dataset as training set and 30% as test set
-# sample <- sample(c(TRUE, FALSE), nrow(onehot_encoding_noNAs), replace=TRUE, prob=c(0.2,0.8))
-# train  <- onehot_encoding_noNAs[sample, ]
-# test   <- onehot_encoding_noNAs[!sample, ]
-```
-
-
-
-## Boruta
-
-```{r}
-# set.seed(12)
-# boruta <- Boruta(ciaf_1~., data =train, doTrace = 2, maxRuns = 12)
+onehot_encoding_noNAs_vars = onehot_encoding_noNAs[, colSums(onehot_encoding_noNAs != 0) > 0] %>% as.data.frame()
+colnames(onehot_encoding_noNAs_vars) = "1st Criteria"
 ```
 
 ```{r}
-onehot_encoding_noNAs$ci
+onehot_encoding_noNAs_vars %>% filter(rownames(onehot_encoding_noNAs_vars) != c("elig_1", "child_alive_1"))
+
+```
+
+
+```{r}
+onehot_encoding_noNAs_diff_vars = onehot_encoding_noNAs_vars %>% filter(`1st Criteria` == TRUE) %>% rownames()
+```
+
+```{r}
+chisq_test = vector(mode = "list")
+chisq_df = vector(mode = "list")
+
+for(feature in onehot_encoding_noNAs_diff_vars[ !(onehot_encoding_noNAs_diff_vars %in% c("elig_1", "child_alive_1", "christian_0"))]){
+  
+  chisq_test[[feature]] = chisq.test(x = onehot_encoding_noNAs[[feature]],
+                                     y =  onehot_encoding_noNAs[["ciaf_1"]])
+  
+  chisq_df[[feature]] = data.frame(test_statistic = chisq_test[[feature]]$statistic,
+             p_value = chisq_test[[feature]]$p.value,
+             row.names = feature)
+}
+
+
+FeatureSelection_chisquared = do.call("rbind", chisq_df) %>% arrange(desc(test_statistic))
+```
+
+```{r}
+write.table(x = FeatureSelection_chisquared[!(rownames(FeatureSelection_chisquared) %in% "ciaf_1"), ] %>% rownames_to_column(var = "Feature"),
+            file = "C:/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/Feature_selection/Chi_squared_feature_selection.txt",
+            quote = FALSE,
+            sep = "\t",
+            row.names = FALSE,
+            col.names = TRUE)
+
 ```
 
 
