@@ -22,7 +22,7 @@ library(survey)  # to calculate weighted ratio for GAR
 library(Hmisc)
 library(tidyr)
 library(mltools)
-library(Boruta)
+library(stats)
 ```
 
 ```{r}
@@ -92,7 +92,9 @@ for(feature in onehot_encoding_noNAs_diff_vars[ !(onehot_encoding_noNAs_diff_var
   
   chisq_df[[feature]] = data.frame(test_statistic = chisq_test[[feature]]$statistic,
              p_value = chisq_test[[feature]]$p.value,
-             row.names = feature)
+             row.names = feature)  %>% 
+    arrange(p_value) %>%
+  dplyr::mutate(p_value_adj = p.adjust(p_value, method = "BH")) 
 }
 
 
@@ -108,6 +110,7 @@ write.table(x = FeatureSelection_chisquared[!(rownames(FeatureSelection_chisquar
             col.names = TRUE)
 
 ```
+
 
 
 
