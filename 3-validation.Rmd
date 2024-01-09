@@ -19,6 +19,7 @@ library(imputeTS)
 library(mice)
 library(ROCit)
 library(pROC)
+library(ggplot2)
 ```
 
 ```{r message=FALSE, cache=F}
@@ -92,11 +93,38 @@ df_model_nona <- na.omit(df_model) %>%
    dplyr::mutate_if(is.character, as.integer) #Change from character to integer
 ```
 
-
+## UMAP Plot
 ```{r}
-# Umap_dfmodel_nona = umap::umap(d = df_model_nona)
+ciaf = df_model_nona$ciaf %>% replace(df_model_nona$ciaf == 1, "Malnourished") %>% 
+  replace(df_model_nona$ciaf == 0, "Not Malnourished")
+  
+
+Umap_dfmodel_nona = umap::umap(d = df_model_nona)
+
+```
+```{r}
+#Dataframe of Umap
+Umap_df = Umap_dfmodel_nona$layout %>% as.data.frame()
+colnames(Umap_df) = c("x", "y")
+
+
+Umap_ggplot2 = ggplot() +
+  geom_point(data = Umap_df, aes(x = x, y = y, color = ciaf)) +
+   scale_color_manual(values = c("Malnourished" = "#DF536B", 
+                                 "Not Malnourished" = "#61D04F")) +
+  ggtitle(label = "UMAP Validation Plot (Removed NA)") +
+  theme_classic()
 ```
 
+```{r}
+pdf(file = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/Umap_Visualizations/UMAP_removedNA_plot.pdf",
+    height =  10,
+    width = 10)
+
+Umap_ggplot2
+
+dev.off()
+```
 
 
 ```{r}
