@@ -1,0 +1,307 @@
+---
+title: "Perm original model validation"
+output: html_document
+date: "2024-01-08"
+---
+
+From Stata to R
+https://fsolt.org/blog/posts/switch-to-r/
+https://epi-stats.github.io/Rtutorials/Stata_to_R#recode
+https://www.techtips.surveydesign.com.au/post/the-recode-command
+
+
+```{r setup, include=FALSE}
+library(Hmisc)
+library(rms)
+library(glmnet)
+library(dplyr)
+library(imputeTS)
+library(mice)
+library(ROCit)
+library(caret)
+library(randomForest)
+library(DataExplorer)
+library(corrplot)
+library(ggplot2)
+```
+
+```{r message=FALSE, cache=F}
+source('./mdl-evaluation.R')
+```
+
+```{r}
+#path <- "C:/Users/Arnav Gupta/R_Projects/Infant_Malnutrition/infant_malnutrition_stratification-main/data/recoded"
+path <- "data/recoded/"
+datafile <- "recoded.rda"
+load(paste0(path, datafile))
+```
+
+
+```{r}
+df <- df %>%
+  select(-matches("^hv"))
+```
+
+```{r}
+#
+df$maternal_height_4feet8inches_to_less_5feetinches <- ifelse(df$maternal_height_cm > 142.24  & df$maternal_height_cm < 152.4, 1, 0)
+df$maternal_height_less_4feet8inches <- ifelse(df$maternal_height_cm < 142.24, 1, 0)
+
+
+df$maternal_edu_no <- ifelse(df$mother_education == 0, 1, 0)
+df$maternal_edu_1_7 <- ifelse(df$mother_education >= 1 & df$mother_education <= 7,
+                              1, 0)
+df$maternal_edu_greater_7_10 <- ifelse(df$mother_education >= 7 & df$mother_education <= 10,
+                              1, 0)
+
+df$sex_male <- ifelse(df$female == "0. male",
+                                   1,
+                                   0)
+
+df$pre_birth_interval_less_than_equal_to_24_months <- ifelse(df$pre_birth_interval == "2. < 24 months", 1, 0)
+df$birth_weight_less_than_1800_g <- ifelse(df$birthweight == "1. 1800g or less", 1, 0)
+df$birth_weight_1800_g_2500_g <- ifelse(df$birthweight == "2. 1801 to 2500g", 1, 0)
+df$num_siblings_two_or_more <- ifelse(df$siblings_bin == "2. 2 or more", 1, 0)
+df$low_caste <- ifelse(df$low_caste == 1, 1, 0)
+df$toliet_access_no <- ifelse(df$toilet_type == "0. no toilet", 1,0)
+df$house_partially_finished_no <- ifelse(df$house_finish != "1. some concrete material", 1, 0)
+df$separate_kitchen_no <- ifelse(df$kitchen == 0, 1,0)
+df$Northeast_focus <- ifelse(df$focus_states == "1. NE Focus", 1, 0)
+df$Other_Focus <- ifelse(df$focus_states == "2. Other focus", 1, 0)
+df$mean_district_CIAF_40_49.9 <- ifelse(df$ciaf_decile == "40%", 1, 0)
+df$mean_district_CIAF_50_59.9 <- ifelse(df$ciaf_decile == "50%", 1, 0)
+df$mean_district_CIAF_60_69.9 <- ifelse(df$ciaf_decile == "60%", 1, 0)
+df$mean_district_CIAF_70_79.9 <- ifelse(df$ciaf_decile == "70%", 1, 0)
+df$mean_district_CIAF_80_89.9 <- ifelse(df$ciaf_decile == "80%", 1, 0)
+
+# remove cooking_fuel if it exists
+if ("cooking_fuel" %in% names(df)) {
+  df <- df %>% select(-cooking_fuel)
+}
+
+df$cooking_fuel <- case_when(
+  df$fuel_type == "1. electricity/gas/kerosene" ~ 1,
+  df$fuel_type == "2. wood/coal" | df$fuel_type == "3. straw/hay/dung" ~ 0,
+  TRUE ~ NA_real_
+)
+
+levels(df$cooking_fuel) <- c("0. solid fuel", "1. non-solid fuel")
+
+
+df$cooking_fuel_solid <- ifelse(df$cooking_fuel == 0, 1, 0)
+
+# # remove use_finish if it exists
+# if ("use_soap" %in% names(df)) {
+#   df <- df %>% select(-use_soap)
+# }
+# 
+# df$use_soap <- NA
+# df$use_soap <- case_when(
+#     df$hv230a < 3 & !is.na(df$hv232)  ~ 0,
+#     is.na(df$hv230a) & df$hv232 == 1  ~ 1,
+# TRUE ~ NA_real_
+# )
+
+
+
+
+
+```
+
+```{r}
+model_vars <- c("maternal_height_4feet8inches_to_less_5feetinches",
+                "maternal_height_less_4feet8inches",
+                "maternal_edu_no",
+                "maternal_edu_1_7",
+                "maternal_edu_greater_7_10",
+                "sex_male",
+                "pre_birth_interval_less_than_equal_to_24_months",
+                "birth_weight_less_than_1800_g",
+                "birth_weight_1800_g_2500_g",
+                "num_siblings_two_or_more",
+                "low_caste",
+                "toliet_access_no",
+                "house_partially_finished_no",
+                "separate_kitchen_no",
+                "cooking_fuel_solid",
+                "Northeast_focus",
+                "Other_Focus",
+                "mean_district_CIAF_40_49.9",
+                "mean_district_CIAF_50_59.9",
+                "mean_district_CIAF_60_69.9",
+                "mean_district_CIAF_70_79.9",
+                "mean_district_CIAF_80_89.9", 
+                "ciaf")
+
+model_coeffs <- c(intercept = -1.62,  
+                  maternal_height_4feet8inches_to_less_5feetinches = 0.34, 
+                  maternal_height_less_4feet8inches = 0.79,
+                  maternal_edu_no = 0.45,
+                  maternal_edu_1_7 = 0.30,
+                  maternal_edu_greater_7_10 = 0.17,
+                  sex_male = 0.10,
+                  pre_birth_interval_less_than_equal_to_24_months = 0.23,
+                  birth_weight_less_than_1800_g = 0.88,
+                  birth_weight_1800_g_2500_g = 0.46,
+                  num_siblings_two_or_more = 0.07,
+                  low_caste = 0.14,
+                  toliet_access_no = 0.18,
+                  house_partially_finished_no = 0.12,
+                  separate_kitchen_no = 0.07,
+                  cooking_fuel_solid = 0.07,
+                  Northeast_focus = -0.16,
+                  Other_Focus = -0.23,
+                  mean_district_CIAF_40_49.9 = 0.29,
+                  mean_district_CIAF_50_59.9 = 0.60,
+                  mean_district_CIAF_60_69.9 = 0.87,
+                  mean_district_CIAF_70_79.9 = 1.11,
+                  mean_district_CIAF_80_89.9 = 1.64)
+
+df_model <- df[, model_vars] 
+
+df_model_nona <- na.omit(df_model)
+```
+
+```{r}
+df_model_nona
+```
+
+```{r}
+df
+```
+
+```{r}
+# Function to calculate the predicted the log odds (linear term of the model)
+calc_log_odds <- function(coefficients, data) {
+  # Extract the intercept from the coefficients
+  intercept <- coefficients[1]
+  
+  # Extract the predictor variables from the coefficients
+  predictors <- coefficients[-1]
+  
+  # Calculate the linear predictor using the coefficients and predictor values
+  linear_predictor <- intercept + rowSums(predictors * data)
+  
+  return(linear_predictor)
+}
+
+# Function to calculate the predicted probabilities given the log odds
+calc_pred_probs <- function(log_odds) {
+  # Apply the logistic link function to get the predicted probabilities
+  probabilities <- 1 / (1 + exp(-log_odds))
+  return(probabilities)
+}
+```
+
+
+```{r}
+data0 <- df_model_nona
+data1 <- df_model
+data2 <- df
+#binary_vars <- sapply(df_model, function(x) length(unique(x)) == 2 && all(unique(x) %in% c(0, 1)))
+#df_filtered <- subset(df_model, select = !binary_vars)
+
+sapply(data1, function(x) sum(is.na(x)))
+init = mice(data1, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+```
+
+
+```{r}
+set.seed(5)
+imputed = mice(data1, method='logreg', predictorMatrix=predM, m=3, maxit=3)
+
+```
+
+
+```{r}
+imputed_data <- complete(imputed)
+imputed_data
+pred0 <- calc_log_odds(model_coeffs, imputed_data)
+prob0 <- calc_pred_probs(pred0)
+```
+
+
+```{r}
+control <- rfeControl(functions = rfFuncs, method = "repeatedcv", repeats = 5, number = 5)
+```
+
+
+```{r}
+x <- df_model_nona %>% select(-ciaf) %>% as.data.frame()
+y <- df_model_nona$ciaf
+set.seed(2021)
+inTrain <- createDataPartition(y, p = .80, list = FALSE)[,1]
+
+x_train <- x[ inTrain, ]
+x_test  <- x[-inTrain, ]
+
+y_train <- y[ inTrain]
+y_test  <- y[-inTrain]
+```
+
+
+```{r}
+result_rfe1 <- rfe(x = x_train, 
+                   y = y_train, 
+                   sizes = c(1:22),
+                   rfeControl = control)
+
+# Print the results
+result_rfe1
+
+# Print the selected features
+predictors(result_rfe1)
+
+# Print the results visually
+ggplot(data = result_rfe1, metric = "Accuracy") + theme_bw()
+ggplot(data = result_rfe1, metric = "Kappa") + theme_bw()
+```
+
+```{r}
+prob0
+```
+
+
+```{r}
+test <- randomForest(ciaf~ ., data= df_model_nona, ntree = 10)
+importance(test)
+varImpPlot(test)
+```
+
+
+```{r}
+#test_imputed <- randomForest(ciaf~ ., data= imputed_data, ntree = 6)
+#importance(test_imputed)
+#varImpPlot(test)
+M = cor(imputed_data)
+corrplot(M, type = "upper", tl.pos = "td",
+         method = "circle", tl.cex = 0.5, tl.col = 'black', diag = FALSE)
+
+```
+
+```{r}
+
+mdl_folder0 = "C:/Users/Arnav Gupta/R_Projects/Infant_Malnutrition/infant_malnutrition_stratification-main"
+mdl_folder0 <- "data/orig-model-validation/"
+dir.create(mdl_folder0)
+
+
+# Generate the data frame with the data needed for the calibration and ROC plots
+plot_data0 <- data.frame(out = data0$ciaf, logodds = pred0, prob = prob0)
+
+cal_plot(base_model, plot_data0, "prob", model_label = '', dir = mdl_folder0, fn = "cal_plot.pdf")
+cal_c0 <- cal_coeff(plot_data0, "prob", mdl_folder0, "cal_plot_coefficients.txt")
+print(cal_c0)
+
+roc_plot(imputed$ciaf, prob0, dir = mdl_folder0, fn = "roc_plot.pdf")
+```
+```{r}
+plot_roc_perf(plot_data0$out, plot_data0$prob)
+```
+
+```{r}
+conf_matrix(plot_data0$out, plot_data0$prob, 0.5, mdl_folder0, "conf_matrix.txt")
+```
