@@ -23,13 +23,17 @@ library(Hmisc)
 library(tidyr)
 library(mltools)
 library(stats)
+library(randomForest)
+library(DataExplorer)
+library(corrplot)
+library(ggplot2)
 ```
 
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/recoded.rda"
-#path <- "data/DHS-2019-21/"
-
-load(file = path)
+#path <- "C:/Users/Arnav Gupta/R_Projects/Infant_Malnutrition/infant_malnutrition_stratification-main/data/recoded"
+path <- "C:/Users/Arnav Gupta/R_Projects/Infant_Malnutrition/infant_malnutrition_stratification-main/data/recoded/"
+datafile <- "recoded.rda"
+load(paste0(path, datafile))
 ```
 
 
@@ -39,7 +43,10 @@ pattern = "^v[0-9][0-9][0-9]*|^hv[0-9][0-9][0-9]*|^ml[0-9][0-9]*|^h[0-9][0-9]|^s
 var = stringr::str_detect(string = df %>% colnames(),
                      pattern = pattern)
 
-selected_var = df[!var] %>% colnames()
+var = var[!grepl("NA$", var)]
+
+#selected_var = df[!var] %>% colnames()
+selected_var = df[!colnames(df) %in% var]
 
 ```
 ```{r}
@@ -62,6 +69,14 @@ onehot_encoding = one_hot(as.data.table(df[factor_variables]),
         naCols = TRUE,
         sparsifyNAs =TRUE)
 onehot_encoding
+```
+```{r}
+# importance_test <- randomForest(ciaf~ ., data= onehot_encoding, ntree = 10)
+# importance(test)
+# varImpPlot(test)
+M = cor(onehot_encoding)
+corrplot(M, type = "upper", tl.pos = "td",
+         method = "circle", tl.cex = 0.1, tl.col = 'black', diag = FALSE)
 ```
 
 ```{r}
