@@ -3055,10 +3055,7 @@ rev(colnames(df))
 path <- "data/DHS-2019-21/"
 dffile <- "recoded.rda"
 save(df, file = here(path, dffile))
-```
 
-```{r}
-path <- "data/DHS-2019-21/"
-dffile <- "recoded-variables.txt"
-write.table(recoded_vars, here(path, dffile), row.names = FALSE, col.names = FALSE)
+rvfile <- "recoded-variables.txt"
+write.table(recoded_vars, here(path, rvfile), row.names = FALSE, col.names = FALSE)
 ```

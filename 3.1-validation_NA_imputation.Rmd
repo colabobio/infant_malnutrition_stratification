@@ -26,14 +26,11 @@ source('./mdl-evaluation.R')
 ```
 
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/recoded.rda"
-# #path <- "data/DHS-2019-21/"
-datafile <- "recoded.rda"
-load(file = "/Users/justi/OneDrive/Desktop/colabo_data/data/recoded.rda")
-
+#path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+path <- "data/DHS-2019-21/"
+dffile <- "recoded.rda"
+load(file = here(path, dffile))
 ```
-
-
 
 ```{r}
 model_vars <- c("maternal_height_4feet8inches_to_less_5feetinches",
