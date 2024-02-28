@@ -1,0 +1,471 @@
+---
+title: "Model update"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+library(Hmisc)
+library(rms)
+library(glmnet)
+library(tidyr)
+library(dplyr)
+library(purrr)
+library(ROCit)
+```
+
+This notebook updates iteratively updates the base prognostic model applying recalibration, by adding additional lab variables in blocks of 2 days
+
+Some ideas to consider further:
+* If Elastic Net variable selection is applied on data w/out missing data,
+  generate frames by censoring a given percentage of data (e.g.: 10%) and apply MI
+* Try Bayesian Variable Selection:
+https://github.com/BasisResearch/millipede
+https://cran.r-project.org/web/packages/BayesVarSel/
+https://cran.r-project.org/web/packages/BayesVarSel/BayesVarSel.pdf
+
+```{r message=FALSE, cache=F}
+source('./mdl-evaluation.R')
+source('./mdl-selection.R')
+
+num_imp <-100       # Number of multiple imputations
+num_boot <- 200     # Number of bootstrap samples
+random_seed <- 151  # Setting random seed for reproducibility
+
+min_age <- 18       #  Minimum age for inclusion in analysis
+
+max_cor <- 0.75     # Maximum correlation between variables to be included in model
+```
+
+```{r}
+# Load the data, remove children, remove patients with less than 1 day of stay, and transform Ct values into Z-scores
+
+data <- read.csv('data.csv')
+data <- data %>% filter(age >= min_age)
+data <- data %>% filter(days > 0)
+
+data$ct12 <- (data$ct12 - mean(data$ct12, na.rm=T))/sd(data$ct12, na.rm=T)
+data$ct34 <- (data$ct34 - mean(data$ct34, na.rm=T))/sd(data$ct34, na.rm=T)
+data$ct56 <- (data$ct56 - mean(data$ct56, na.rm=T))/sd(data$ct56, na.rm=T)
+data$ct78 <- (data$ct78 - mean(data$ct78, na.rm=T))/sd(data$ct78, na.rm=T)
+
+data
+```
+
+```{r}
+# Construct the base prognostic model that only uses age and Ct in the first 48 hours
+
+base_model <- function(df) {
+  # Calculate the linear term in the logistic function of the model
+  # p(x) = 1 / (1+exp(-lp(x))
+  lp = with(df, 
+            0.86215 - 
+              0.05343*age + 
+              3*10^-5*max(age - 5.0, 0)^3 - 
+              6*10^-5*max(age - 30.0, 0)^3 + 
+              3*10^-5*max(age - 58.0, 0)^3 - 
+              0.8694*ct12)
+  return(lp)
+}
+```
+
+```{r}
+# Add the logit contribution from the base model to the dataframe
+
+vars0 <- c('out', 'age', 'ct12')
+all_data0 <- data %>% select(all_of(vars0)) # This dataframe includes missing entries
+
+lp0 <- unlist(map(1:nrow(all_data0), function(x) base_model(all_data0[x,])))
+data['lp0'] <- lp0
+data
+```
+
+
+```{r}
+# Plot calibration and ROC plots of the base model
+
+mdl_folder0 <- "model-0"
+dir.create(mdl_folder0)
+
+data0 <- all_data0[complete.cases(all_data0),]
+
+pred0 <- unlist(map(1:nrow(data0), function(x) base_model(data0[x,]))) # prediction in log-odds (probabilities on logit scale)
+prob0 <- 1 / (1 + exp(-pred0))                                         # prediction as probability response
+
+# Generate the data frame with the data needed for the calibration and ROC plots
+plot_data0 <- data.frame(out = data0$out, logodds = pred0, prob = prob0)
+
+cal_plot(base_model, plot_data0, "prob", model_label = '', dir = mdl_folder0, fn = "cal_plot.pdf")
+cal_c0 <- cal_coeff(plot_data0, "prob", mdl_folder0, "cal_plot_coefficients.txt")
+print(cal_c0)
+
+roc_plot(data0$out, prob0, dir = mdl_folder0, fn = "roc_plot.pdf")
+```
+
+```{r}
+plot_roc_perf(plot_data0$out, plot_data0$prob)
+```
+
+```{r}
+conf_matrix(plot_data0$out, plot_data0$prob, 0.5, mdl_folder0, "conf_matrix.txt")
+```
+
+==============================================================================================
+UPDATED MODEL FOR DAYS 1-2
+
+```{r}
+# Apply the Elastic Net variable selecion method on all the lab variables available for days 1-2
+
+sat_imp_formula12 <- "~out + lp0 + alb12 + alt12 + ast12 + bun12 + ck12 + cre12 + crp12 + k12"
+
+vars12 <- c('out', 'lp0', 'alb12', 'alt12', 'ast12', 'bun12', 'ck12', 'cre12', 'crp12', 'k12')
+data12 <- data[complete.cases(data[, c('lp0')]),]
+data12 <- data12 %>% filter(days > 0)
+data12
+
+sout12 <- selectVariables(random_seed, num_imp, sat_imp_formula12, data12, TRUE)
+
+varf12 <- data.frame(unlist(sout12$names), unlist(sout12$counts))
+names(varf12) <- c("Variable", "Freq")
+varf12 <- varf12 %>% filter(Variable != "lp0" & Variable != "(Intercept)")
+varf12
+```
+
+```{r}
+# Apply threshold
+day12_sel_thres <- 0.5
+sel12 <- varf12 %>% filter(Freq > day12_sel_thres)
+sel12
+```
+
+```{r}
+cov12 <- cor(data12[,sel12$Variable], use='pairwise') > 0.75
+cov12
+```
+
+```{r}
+library(BayesVarSel)
+
+
+formula <- as.formula(sat_imp_formula12)
+imp_data <- aregImpute(formula, data=data12, n.impute=1)
+for (i in 1:1) {
+    df <- getImpute(impute=imp_data, df=data12, im=i)
+    m <- Bvs(formula = out ~ lp0 + alb12 + alt12 + ast12 + bun12 + ck12 + cre12 + crp12 + k12, data = df)
+    print(m)
+}
+```
+
+
+```{r}
+# Train the model for days 1-2 on the selected variables
+mdl_vars12 <- append(sel12$Variable, 'lp0')
+# mdl_vars12 <- mdl_vars12[! mdl_vars12 %in% c()] # Remove highly correlated variables
+mdl_vars12
+
+mdl_imp_formula12 <- "~out + lp0 + alb12 + alt12 + ast12 + bun12 + ck12 + cre12 + crp12 + k12"
+mdl_lgr_formula12 <- paste('out', paste(mdl_vars12, collapse=" + "), sep=" ~ ")
+mdl_lgr_formula12
+
+mdl_folder12 <- "model-days12"
+dir.create(mdl_folder12)
+
+model12 <- generateModel(random_seed, num_imp, num_boot, 3, mdl_imp_formula12, mdl_lgr_formula12, data12, mdl_vars12, mdl_folder12)
+
+# Add the logit contribution from the model for days 1-2 to the dataframe
+data['lp12'] <- predict(model12, data)
+```
+
+```{r}
+# Generate the calibration and ROC plots for the models for days 1-2
+
+vars <- append(mdl_vars12, 'out')
+df <- data %>% select(all_of(vars))
+full_data12 <- df[complete.cases(df),]
+full_data12
+
+pred12 <- predict(model12, full_data12) # prediction in log-odds (probabilities on logit scale)
+probs12 <- 1 / (1 + exp(-pred12))  # prediction as probability response
+
+# Generate the data frame with the data needed for the calibration and ROC plots
+plot_data12 <- data.frame(out = full_data12$out, logodds = pred12, prob = probs12)
+
+cal_plot(model12, plot_data12, "prob", model_label = '', dir = mdl_folder12, fn = "cal_plot.pdf")
+cal_c12 <- cal_coeff(plot_data12, "prob", mdl_folder12, "cal_plot_coefficients.txt")
+print(cal_c12)
+
+roc_plot(plot_data12$out, plot_data12$prob, dir = mdl_folder12, fn = "roc_plot.pdf")
+```
+
+```{r}
+plot_roc_perf(plot_data12$out, plot_data12$prob)
+```
+
+```{r}
+conf_matrix(plot_data12$out, plot_data12$prob, 0.5, mdl_folder12, "conf_matrix.txt")
+```
+
+==============================================================================================
+UPDATED MODEL FOR DAYS 3-4
+
+```{r}
+# Apply the Elastic Net variable selecion method on all the lab variables available for days 3-4
+
+sat_imp_formula34 <- "~out + lp12 + alb34 + alt34 + ast34 + bun34 + ck34 + cre34 + crp34 + k34"
+
+vars34 <- c('out', 'lp12', 'alb34', 'alt34', 'ast34', 'bun34', 'ck34', 'cre34', 'crp34', 'k34')
+data34 <- data[complete.cases(data[, c('lp12')]),]
+data34 <- data34 %>% filter(days > 2)
+data34
+
+sout34 <- selectVariables(random_seed, num_imp, sat_imp_formula34, data34, TRUE)
+
+varf34 <- data.frame(unlist(sout34$names), unlist(sout34$counts))
+names(varf34) <- c("Variable", "Freq")
+varf34 <- varf34 %>% filter(Variable != "lp12" & Variable != "(Intercept)")
+varf34
+```
+
+```{r}
+# Apply threshold
+day34_sel_thres <- 0.5
+sel34 <- varf34 %>% filter(Freq > day34_sel_thres)
+sel34
+```
+
+```{r}
+cov34 <- cor(data34[,sel34$Variable], use='pairwise') > 0.75
+cov34
+```
+
+```{r}
+library(BayesVarSel)
+
+formula <- as.formula(sat_imp_formula34)
+imp_data <- aregImpute(formula, data=data34, n.impute=1)
+for (i in 1:1) {
+    df <- getImpute(impute=imp_data, df=data34, im=i)
+    m <- Bvs(formula = out ~ lp12 + alb34 + alt34 + ast34 + bun34 + ck34 + cre34 + crp34 + k34, data = df)
+    print(m)
+}
+```
+
+
+```{r}
+# Train the model for days 3-4 on the selected variables
+mdl_vars34 <- append(sel34$Variable, 'lp12')
+mdl_vars34 <- mdl_vars34[! mdl_vars34 %in% c('cre34')] # Remove highly correlated variables
+mdl_vars34
+
+mdl_imp_formula34 <- "~out + lp12 + alb34 + alt34 + ast34 + bun34 + ck34 + cre34 + crp34 + k34"
+mdl_lgr_formula34 <- paste('out', paste(mdl_vars34, collapse=" + "), sep=" ~ ")
+mdl_lgr_formula34
+
+mdl_folder34 <- "model-days34"
+dir.create(mdl_folder34)
+
+model34 <- generateModel(random_seed, num_imp, num_boot, 3, mdl_imp_formula34, mdl_lgr_formula34, data34, mdl_vars34, mdl_folder34)
+
+# Add the logit contribution from the model for days 3-4 to the dataframe
+data['lp34'] <- predict(model34, data)
+```
+
+```{r}
+# Generate the calibration and ROC plots for the models for days 3-4
+
+vars <- append(mdl_vars34, 'out')
+df <- data %>% select(all_of(vars))
+full_data34 <- df[complete.cases(df),]
+full_data34
+
+pred34 <- predict(model34, full_data34) # prediction in log-odds (probabilities on logit scale)
+probs34 <- 1 / (1 + exp(-pred34))  # prediction as probability response
+
+# Generate the data frame with the data needed for the calibration and ROC plots
+plot_data34 <- data.frame(out = full_data34$out, logodds = pred34, prob = probs34)
+
+cal_plot(model34, plot_data34, "prob", model_label = '', dir = mdl_folder34, fn = "cal_plot.pdf")
+cal_c34 <- cal_coeff(plot_data34, "prob", mdl_folder34, "cal_plot_coefficients.txt")
+print(cal_c34)
+
+roc_plot(plot_data34$out, plot_data34$prob, dir = mdl_folder34, fn = "roc_plot.pdf")
+```
+
+```{r}
+plot_roc_perf(plot_data34$out, plot_data34$prob)
+```
+
+```{r}
+conf_matrix(plot_data34$out, plot_data34$prob, 0.4, mdl_folder34, "conf_matrix.txt")
+```
+
+==============================================================================================
+UPDATED MODEL FOR DAYS 5-6
+
+```{r}
+# Apply the Elastic Net variable selecion method on all the lab variables available for days 5-6
+
+sat_imp_formula56 <- "~out + lp34 + alb56 + alt56 + ast56 + bun56 + ck56 + cre56 + crp56 + k56"
+
+vars56 <- c('out', 'lp34', 'alb56', 'alt56', 'ast56', 'bun56', 'ck56', 'cre56', 'crp56', 'k56')
+data56 <- data[complete.cases(data[, c('lp34')]),]
+data56 <- data56 %>% filter(days > 4)
+data56
+
+sout56 <- selectVariables(random_seed, num_imp, sat_imp_formula56, data56, TRUE)
+
+varf56 <- data.frame(unlist(sout56$names), unlist(sout56$counts))
+names(varf56) <- c("Variable", "Freq")
+varf56 <- varf56 %>% filter(Variable != "lp34" & Variable != "(Intercept)")
+varf56
+```
+
+```{r}
+# Apply threshold
+day56_sel_thres <- 0.5
+sel56 <- varf56 %>% filter(Freq > day56_sel_thres)
+sel56
+```
+
+```{r}
+cov56 <- cor(data56[,sel56$Variable], use='pairwise') > 0.75
+cov56
+```
+
+```{r}
+library(BayesVarSel)
+
+formula <- as.formula(sat_imp_formula56)
+imp_data <- aregImpute(formula, data=data56, n.impute=1)
+for (i in 1:1) {
+    df <- getImpute(impute=imp_data, df=data56, im=i)
+    m <- Bvs(formula = out ~ lp34 + alb56 + alt56 + ast56 + bun56 + ck56 + cre56 + crp56 + k56, data = df)
+    print(m)
+}
+
+```
+
+```{r}
+# Train the model for days 5-6 on the selected variables
+mdl_vars56 <- append(sel56$Variable, 'lp34')
+#mdl_vars56 <- mdl_vars56[! mdl_vars56 %in% c()] # Remove highly correlated variables
+mdl_vars56
+
+mdl_imp_formula56 <- "~out + lp34 + alb56 + alt56 + ast56 + bun56 + ck56 + cre56 + crp56 + k56"
+mdl_lgr_formula56 <- paste('out', paste(mdl_vars56, collapse=" + "), sep=" ~ ")
+mdl_lgr_formula56
+
+mdl_folder56 <- "model-days56"
+dir.create(mdl_folder56)
+
+# setting number of knots to zero based on this discussion:
+# https://stats.stackexchange.com/questions/117383/impute-missing-values-using-aregimpute
+model56 <- generateModel(random_seed, num_imp, num_boot, 0, mdl_imp_formula56, mdl_lgr_formula56, data56, mdl_vars56, mdl_folder56)
+
+# Add the logit contribution from the model for days 5-6 to the dataframe
+data['lp56'] <- predict(model56, data)
+```
+
+```{r}
+# Generate the calibration and ROC plots for the models for days 5-6
+
+vars <- append(mdl_vars56, 'out')
+df <- data %>% select(all_of(vars))
+full_data56 <- df[complete.cases(df),]
+full_data56
+
+pred56 <- predict(model56, full_data56) # prediction in log-odds (probabilities on logit scale)
+probs56 <- 1 / (1 + exp(-pred56))  # prediction as probability response
+
+# Generate the data frame with the data needed for the calibration and ROC plots
+plot_data56 <- data.frame(out = full_data56$out, logodds = pred56, prob = probs56)
+
+cal_plot(model56, plot_data56, "prob", model_label = '', dir = mdl_folder56, fn = "cal_plot.pdf")
+cal_c56 <- cal_coeff(plot_data56, "prob", mdl_folder56, "cal_plot_coefficients.txt")
+print(cal_c56)
+
+roc_plot(plot_data56$out, plot_data56$prob, dir = mdl_folder56, fn = "roc_plot.pdf")
+```
+
+```{r}
+plot_roc_perf(plot_data56$out, plot_data56$prob)
+```
+
+```{r}
+conf_matrix(plot_data56$out, plot_data56$prob, 0.6, mdl_folder56, "conf_matrix.txt")
+```
+
+==============================================================================================
+UPDATED MODEL FOR DAYS 7-8
+
+DOES NOT WORK BECAUSE THE DATA IS HIGHLY CLASS-IMBALANCED (out of 39 cases, 37 survived are 2 died, leading to variable selection/model fitting to fail)
+
+```{r}
+# Apply the Elastic Net variable selecion method on all the lab variables available for days 7-8
+
+sat_imp_formula78 <- "~out + lp56 + alb78 + alt78 + ast78 + bun78 + ck78 + cre78 + crp78 + k78"
+
+vars78 <- c('out', 'lp56', 'alb78', 'alt78', 'ast78', 'bun78', 'ck78', 'cre78', 'crp78', 'k78')
+data78 <- data[complete.cases(data[, c('lp56')]),]
+data78 <- data78 %>% filter(days > 6)
+data78
+
+sout78 <- selectVariables(random_seed, num_imp, sat_imp_formula78, data78, TRUE)
+
+varf78 <- data.frame(unlist(sout78$names), unlist(sout78$counts))
+names(varf78) <- c("Variable", "Freq")
+varf78 <- varf78 %>% filter(Variable != "lp56" & Variable != "(Intercept)")
+varf78
+```
+
+```{r}
+# Apply threshold
+day78_sel_thres <- 0.5
+sel78 <- varf78 %>% filter(Freq > day78_sel_thres)
+sel78
+```
+
+```{r}
+cov78 <- cor(data78[,sel78$Variable], use='pairwise') > 0.75
+cov78
+```
+
+```{r}
+# Train the model for days 7-8 on the selected variables
+mdl_vars78 <- append(sel78$Variable, 'lp56')
+#mdl_vars78 <- mdl_vars78[! mdl_vars78 %in% c()] # Remove highly correlated variables
+mdl_vars78
+
+mdl_imp_formula78 <- "~out + lp56 + alb78 + alt78 + ast78 + bun78 + ck78 + cre78 + crp78 + k78"
+mdl_lgr_formula78 <- paste('out', paste(mdl_vars78, collapse=" + "), sep=" ~ ")
+mdl_lgr_formula78
+
+mdl_folder78 <- "model-days78"
+dir.create(mdl_folder78)
+
+# setting number of knots to zero based on this discussion:
+# https://stats.stackexchange.com/questions/117383/impute-missing-values-using-aregimpute
+model78 <- generateModel(random_seed, num_imp, num_boot, 0, mdl_imp_formula78, mdl_lgr_formula78, data78, mdl_vars78, mdl_folder78)
+
+# Add the logit contribution from the model for days 7-8 to the dataframe
+data['lp78'] <- predict(model78, data)
+```
+
+```{r}
+# Generate the calibration and ROC plots for the models for days 7-8
+
+vars <- append(mdl_vars78, 'out')
+df <- data %>% select(all_of(vars))
+full_data78 <- df[complete.cases(df),]
+full_data78
+
+pred78 <- predict(model78, full_data78) # prediction in log-odds (probabilities on logit scale)
+probs78 <- 1 / (1 + exp(-pred78))  # prediction as probability response
+
+# Generate the data frame with the data needed for the calibration and ROC plots
+plot_data78 <- data.frame(out = full_data78$out, logodds = pred78, prob = probs78)
+
+cal_plot(model78, plot_data78, "original", "prob", model_label = '', dir = mdl_folder78, fn = "cal_plot.pdf")
+roc_plot(plot_data78$out, plot_data78$prob, dir = mdl_folder78, fn = "roc_plot.pdf")
+```
