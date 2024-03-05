@@ -341,7 +341,6 @@ gen underweight = .
 replace underweight = 1 if waz < -2
 replace underweight = 0 if waz >= -2 & waz != . 
 
-
 ```{r}
 # Remove the "underweight" column if it exists
 if ("underweight" %in% names(df)) {
@@ -382,7 +381,6 @@ df$o_underweight <- cut(df$waz,
 
 recoded_vars <- append(recoded_vars, "o_underweight")
 ```
-
 
 capture drop wasted 
 gen wasted = . 
@@ -1246,6 +1244,12 @@ recoded_vars <- append(recoded_vars, "fuel_type")
 ```
 
 
+capture drop cooking_fuel
+gen cooking_fuel = . 
+replace cooking_fuel = 1 if fuel_type == 1
+replace cooking_fuel = 0 if fuel_type == 2 | fuel_type == 3
+label define cooking_fuel 0 "0. solid fuel" 1 "1. non-solid fuel"
+label value cooking_fuel cooking_fuel
 ```{r}
 # remove cooking_fuel if it exists
 if ("cooking_fuel" %in% names(df)) {
@@ -1258,10 +1262,9 @@ df$cooking_fuel <- case_when(
   TRUE ~ NA_real_
 ) %>% as.factor()
 
-df$cooking_fuel_solid <- ifelse(df$cooking_fuel == 0, 1, 0) %>% as.factor()
+levels(df$cooking_fuel) <- c("0. solid fuel", "1. non-solid fuel")
 
 recoded_vars <- append(recoded_vars, "cooking_fuel")
-recoded_vars <- append(recoded_vars, "cooking_fuel_solid")
 ```
 
 
@@ -2424,29 +2427,6 @@ df$use_soap[df$hv232 == 1] <- 1
 df$use_soap <- df$use_soap %>% as.factor()
 
 recoded_vars <- append(recoded_vars, "use_soap")
-```
-
-capture drop cooking_fuel
-gen cooking_fuel = . 
-replace cooking_fuel = 1 if fuel_type == 1
-replace cooking_fuel = 0 if fuel_type == 2 | fuel_type == 3
-label define cooking_fuel 0 "0. solid fuel" 1 "1. non-solid fuel"
-label value cooking_fuel cooking_fuel
-```{r}
-# remove cooking_fuel if it exists
-if ("cooking_fuel" %in% names(df)) {
-  df <- df %>% select(-cooking_fuel)
-}
-
-df$cooking_fuel <- case_when(
-  df$fuel_type == "1. electricity/gas/kerosene" ~ 1,
-  df$fuel_type == "2. wood/coal" | df$fuel_type == "3. straw/hay/dung" ~ 0,
-  TRUE ~ NA_real_
-)
-
-levels(df$cooking_fuel) <- c("0. solid fuel", "1. non-solid fuel")
-
-recoded_vars <- append(recoded_vars, "cooking_fuel")
 ```
 
 capture drop reading

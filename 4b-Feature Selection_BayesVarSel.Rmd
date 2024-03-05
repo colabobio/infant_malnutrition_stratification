@@ -29,7 +29,7 @@ library(stats)
 #path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
 path <- "data/DHS-2019-21/"
 filename <- "recoded.rda"
-load(file = paste0(path, filename))
+load(file = here(path, filename))
 ```
 
 
