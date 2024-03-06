@@ -1,16 +1,17 @@
 ---
-title: "4.1 Feature Selection/Machine Learning"
-author: "Justin Guerra"
-date: "2023-11-16"
+title: "DHS data clean-up"
+author: "Justin Guerra, Arnav Gupta, Andres Colubri"
 output: html_document
+date: "2024-03-06"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 # libraries needed
-library(haven)
 library(here)       # to get R project path
+library(haven)      # to handle the haven_labelled columns
+library(mltools)    # for one-hot encoding
 library(tidyverse)  # most variable creation here uses tidyverse 
 library(dplyr)
 ```
@@ -249,10 +250,7 @@ factor_variables = var_class %>% dplyr::filter(variable_class == "factor") %>% d
 print(factor_variables)
 ```
 
-
 ```{r}
-library(mltools)
-
 onehot_encoding = one_hot(as.data.table(dfr[factor_variables]),
         naCols = FALSE,
         sparsifyNAs = FALSE,
@@ -265,8 +263,6 @@ na_count <- sum(is.na(dfr))
 na_count
 ```
 
-
-
 ```{r}
 dfr <- dfr %>% select(-all_of(factor_variables))
 dfr
@@ -275,6 +271,9 @@ dfr
 
 ```{r}
 dfc <- cbind(dfr, onehot_encoding)
+var_class <- get_class_of_columns(dfc)
+unique(var_class$variable_class)
+names(dfc) <- make.names(names(dfc))
 ```
 
 ```{r}
@@ -282,37 +281,10 @@ dfc
 ```
 
 ```{r}
-var_class <- get_class_of_columns(dfc)
-unique(var_class$variable_class)
-```
-
-
-```{r}
 formula_string <- paste(colnames(dfc), collapse = " + ")
 formula_string <- paste0("~", formula_string)
 formula_string
 ```
-
-
-```{r}
-#eligch == 1
-
-#ciaf_NA
-#ciaf_0
-#ciaf_1
-```
-```{r}
-# Get the number of columns
-num_cols <- ncol(dfc)
-
-# Generate new column names
-new_names <- paste0(letters[1:num_cols], 1:num_cols)
-new_names
-
-colnames(dfc) <- new_names
-
-```
-
 
 ```{r}
 library(mice)
@@ -321,33 +293,9 @@ dfc_imp <- mice(dfc,
      maxit = 3)
 ```
 
-
-
-
-
-
-
-
-
-
-
 ```{r}
-NA_OHE_vars = onehot_encoding %>% colnames() %>% str_subset(pattern = "_NA$")
-onehot_encoding_noNAs = onehot_encoding %>% dplyr::select(-c(NA_OHE_vars, "ciaf_0"))
-onehot_encoding_noNAs_vars = onehot_encoding_noNAs[, colSums(onehot_encoding_noNAs != 0) > 0] %>% as.data.frame()
-colnames(onehot_encoding_noNAs_vars) = "1st Criteria"
-```
-
-```{r}
-onehot_encoding_noNAs_vars %>% filter(rownames(onehot_encoding_noNAs_vars) != c("elig_1", "child_alive_1"))
-
-```
-
-
-```{r}
-onehot_encoding_noNAs_diff_vars = onehot_encoding_noNAs_vars %>% filter(`1st Criteria` == TRUE) %>% rownames()
-```
-
-```{r}
-selected_var
+#path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+path <- "data/DHS-2019-21/"
+dffile <- "cleaned.rda"
+save(dfc, file = here(path, dffile))
 ```
