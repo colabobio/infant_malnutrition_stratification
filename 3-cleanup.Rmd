@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 # libraries needed
 library(here)       # to get R project path
 library(haven)      # to handle the haven_labelled columns
+library(mice)       # to impute missing data
+library(data.table) # for one-hot encoding
 library(mltools)    # for one-hot encoding
 library(tidyverse)  # most variable creation here uses tidyverse 
 library(dplyr)
@@ -152,7 +154,8 @@ unique(dfr$iron_3mo)
 unk_vars <- c("anthro_measured",
               "height_position", 
               "last_child_id", 
-              "multiplet")
+              "multiplet",
+              "covariate_nonmissing")
 
 measure_vars <- c("haz", 
                   "waz", 
@@ -189,10 +192,10 @@ ciaf_scale_vars <- c("scale_ciaf1_house",
                      "scale_ciaf1_priority",
                      "score_ciaf1")
 
-other_ciaf_vars <- c("dist_ciaf_mean",
-                     "mean_ciaf_dist",
-                     "dist_ciaf_decile",
-                     "ciaf_decile")
+#other_ciaf_vars <- c("dist_ciaf_mean",
+#                     "mean_ciaf_dist",
+#                     "dist_ciaf_decile",
+#                     "ciaf_decile")
 
 # Remove the columns from dfr
 dfr <- dfr %>% select(-all_of(unk_vars))
@@ -200,7 +203,7 @@ dfr <- dfr %>% select(-all_of(measure_vars))
 dfr <- dfr %>% select(-all_of(redundant_vars))
 dfr <- dfr %>% select(-all_of(geo_vars))
 dfr <- dfr %>% select(-all_of(ciaf_scale_vars))
-dfr <- dfr %>% select(-all_of(other_ciaf_vars))
+#dfr <- dfr %>% select(-all_of(other_ciaf_vars))
 ```
 
 ```{r}
@@ -259,11 +262,6 @@ onehot_encoding
 ```
 
 ```{r}
-na_count <- sum(is.na(dfr))
-na_count
-```
-
-```{r}
 dfr <- dfr %>% select(-all_of(factor_variables))
 dfr
 ```
@@ -277,6 +275,23 @@ names(dfc) <- make.names(names(dfc))
 ```
 
 ```{r}
+const_vars <- c()
+for (var in colnames(dfc)) {
+  unique_values <- unique(dfc[[var]])
+  contains_NA <- any(is.na(unique_values))
+  
+  if ((length(unique_values) == 1) || ((length(unique_values) == 2) && contains_NA))  {
+      print(var)
+      print(unique_values)
+      const_vars <- c(const_vars, var)
+  }
+}
+print("Removing constant variables")
+print(const_vars)
+dfc <- dfc %>% select(-all_of(const_vars))
+```
+
+```{r}
 dfc
 ```
 
@@ -287,10 +302,13 @@ formula_string
 ```
 
 ```{r}
-library(mice)
-dfc_imp <- mice(dfc,
-     m = 3,
-     maxit = 3)
+na_count <- sum(is.na(dfc))
+na_count
+```
+
+```{r}
+dfc_com <- na.omit(dfc)
+dfc_com
 ```
 
 ```{r}
