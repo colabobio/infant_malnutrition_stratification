@@ -1,0 +1,97 @@
+---
+title: "Feature selection"
+author: "Justin Guerra, Arnav Gupta, Andres Colubri"
+output: html_document
+date: "2024-03-06"
+---
+
+```{r setup, include=FALSE}
+library(here)
+library(dplyr)
+library(tidyverse)
+```
+
+```{r}
+path <- "data/"
+dffile <- "cleaned.rda"
+load(file = here(path, dffile))
+dfc
+```
+
+
+```{r}
+
+get_class_of_columns <- function(df) {
+  col_names <- colnames(df)
+  classes <- df %>% sapply(class)
+  col_class <- c()
+  for (name in col_names) {
+    c <- classes[[name]]
+    ccl <- c[1]
+    col_class <- append(col_class, ccl)
+  }
+  df_class <- data.frame(variable_name = col_names, variable_class = col_class)
+  return(df_class)
+}
+
+# rvfile <- "recoded-variables.txt"
+# recoded_vars <- read.table(here(path, rvfile), header = FALSE)$V1
+# dfr <- df[recoded_vars]
+# dfc <- cbind(dfr, onehot_encoding)
+var_class <- get_class_of_columns(dfc)
+
+
+
+library("missForest")
+library("randomForest")
+imputed_data <- missForest(dfc)
+
+# Extract imputed data
+imputed_data <- imputed_data$ximp
+
+# Perform PCA
+pca_result <- prcomp(imputed_data, scale. = TRUE)
+
+# Summary of PCA
+summary(pca_result)
+
+# Biplot of PCA
+biplot(pca_result)
+```
+
+```{r}
+library(missMDA)
+
+# Perform PCA with missing data handling
+pca_result <- pcaMissing(dfc, ncp = 5)  # ncp = number of principal components
+
+# Print the results
+print(pca_result)
+```
+
+
+```{r}
+N <- nrow(dfc)
+nr <- 0.1 * N
+print(nr)
+dfr <- sample_n(dfc, nr)
+na_count <- sum(is.na(dfr))
+print(na_count)
+```
+
+```{r}
+impr <- mice(dfr, m = 3, maxit = 3)
+```
+
+```{r}
+com <- complete(impr, 1)
+na_count <- sum(is.na(com))
+print(na_count)
+```
+
+```{r}
+com <- na.omit(com)
+com
+na_count <- sum(is.na(com))
+print(na_count)
+```
