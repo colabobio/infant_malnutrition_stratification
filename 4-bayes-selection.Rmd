@@ -1,0 +1,104 @@
+---
+title: "Feature selection"
+author: "Justin Guerra, Arnav Gupta, Andres Colubri"
+output: html_document
+date: "2024-03-06"
+---
+
+Bayesian Variable Selection:
+https://github.com/BasisResearch/millipede
+https://cran.r-project.org/web/packages/BayesVarSel/
+https://cran.r-project.org/web/packages/BayesVarSel/BayesVarSel.pdf
+
+```{r setup, include=FALSE}
+library(here) 
+library(mice)
+library(BayesVarSel)
+```
+
+```{r}
+path <- "data/DHS-2019-21/"
+impfile <- "imputed.rda"
+load(file = here(path, impfile))
+```
+
+```{r}
+dffile <- "cleaned.rda"
+load(file = here(path, dffile))
+
+imp <- dfc_imp
+```
+
+```{r}
+# Check convergence
+plot(imp)
+
+# Stack imputed data into one LONG dataset (generates two new variables indicating id and imputation number); raw (unimputed) data are appended (inc = TRUE)
+com <- complete(imp, "long", inc = TRUE)
+```
+
+```{r}
+# Obtain first imputed dataset
+com <- complete(imp, 2)
+com
+```
+
+```{r}
+#unique(dfc$firstbirth_18y)
+unique(dfc$pre_birth_interval)
+```
+
+```{r}
+# Constant variables (only NA and 1 value)
+com$firstbirth_18y <- NULL
+com$pre_birth_interval <- NULL
+```
+
+```{r}
+imp2 <- mice(com,
+     m = 3,
+     maxit = 3)
+```
+
+```{r}
+# Obtain first imputed dataset
+com2 <- complete(imp2, 1)
+com2
+```
+
+```{r}
+na_count <- sum(is.na(com2))
+na_count
+```
+
+
+```{r}
+formula_string <- paste(colnames(com), collapse = " + ")
+formula_string <- paste0("~", formula_string)
+formula_string
+formula <- as.formula(formula_string)
+imp_data <- aregImpute(formula, data=com, n.impute=1)
+```
+
+
+```{r}
+names <- colnames(com)
+names <- names[!names %in% "ciaf"]
+formula_string <- paste(names, collapse = " + ")
+formula_string <- paste0("ciaf ~ ", formula_string)
+formula_string
+
+
+#formula_string <- paste0("~", formula_string)
+#formula_string
+```
+
+```{r}
+comc <- na.omit(com)
+comc
+```
+
+```{r}
+m <- GibbsBvs(formula = as.formula(formula_string), data = comc)
+print(m)
+```
