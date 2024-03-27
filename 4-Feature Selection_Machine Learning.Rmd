@@ -118,7 +118,7 @@ FeatureSelection_chisquared = do.call("rbind", chisq_df) %>% arrange(desc(test_s
 
 ```{r}
 write.table(x = FeatureSelection_chisquared[!(rownames(FeatureSelection_chisquared) %in% "ciaf_1"), ] %>% rownames_to_column(var = "Feature"),
-            file = "C:/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/Feature_selection/Chi_squared_feature_selection.txt",
+            file = "C:/Users/Arnav Gupta/R_Projects/infant_malnutrition_stratification/Arnav_Test",
             quote = FALSE,
             sep = "\t",
             row.names = FALSE,
