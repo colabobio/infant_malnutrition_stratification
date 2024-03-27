@@ -6,9 +6,13 @@ date: "2024-03-06"
 ---
 
 ```{r setup, include=FALSE}
-library(mice)
+#library(mice)
+library(missForest)
+library(missMDA)
 library(here) 
 ```
+
+https://chat.openai.com/share/bdcba433-a038-4d85-9119-02b17f98e2e4
 
 ```{r}
 path <- "data/DHS-2019-21/"
@@ -40,8 +44,50 @@ method
 ```
 
 ```{r}
-impr <- mice(dfc, m = 3, maxit = 3, method=method)
+set.seed(123)  # Setting a seed for reproducibility
+n <- nrow(dfc)
+indices <- sample(rep(1:10, length.out = n))
+indices
 ```
+
+```{r}
+# Splitting the dataframe into a list of 10 dataframes
+subsamples <- lapply(1:10, function(i) dfc[indices == i, ])
+```
+
+
+```{r}
+df <- as.data.frame(subsamples[1])
+dim(df)
+```
+
+```{r}
+#impr <- mice(dfc, m = 3, maxit = 3, method=method)
+```
+
+```{r}
+dfc_imp <- missForest(df)
+```
+
+
+
+```{r}
+# Estimate the number of dimensions
+ncp <- estim_ncpPCA(df, method = "BIC")
+print(ncp$ncp)
+```
+
+```{r}
+result <- imputeMCA(df, ncp = ncp$ncp)
+
+# The imputed data
+imputed_data <- result$completeObs
+```
+
+
+
+
+
 
 
 ```{r}
