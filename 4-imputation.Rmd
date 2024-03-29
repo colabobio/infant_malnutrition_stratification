@@ -6,7 +6,7 @@ date: "2024-03-06"
 ---
 
 ```{r setup, include=FALSE}
-#library(mice)
+library(mice)
 library(missForest)
 library(missMDA)
 library(here) 
@@ -57,34 +57,47 @@ subsamples <- lapply(1:10, function(i) dfc[indices == i, ])
 
 
 ```{r}
-df <- as.data.frame(subsamples[1])
-dim(df)
+df1 <- as.data.frame(subsamples[1])
+dim(df1)
 ```
 
 ```{r}
-#impr <- mice(dfc, m = 3, maxit = 3, method=method)
+dfimp_mice1 <- mice(df1, m = 3, maxit = 3, method=method)
 ```
 
 ```{r}
-dfc_imp <- missForest(df)
+com <- complete(dfimp_mice1, 1)
+com
+```
+
+```{r}
+na_count <- sum(is.na(com))
+na_count
+```
+
+```{r}
+dfimp_for1 <- missForest(df1)
 ```
 
 
 
 ```{r}
 # Estimate the number of dimensions
-ncp <- estim_ncpPCA(df, method = "BIC")
+ncp <- estim_ncpPCA(df1, method = "EM")
 print(ncp$ncp)
 ```
 
 ```{r}
-result <- imputeMCA(df, ncp = ncp$ncp)
+# https://rdrr.io/cran/missMDA/man/imputeFAMD.html
 
-# The imputed data
-imputed_data <- result$completeObs
+result <- imputeMCA(df1, ncp = ncp$ncp)
 ```
 
 
+```{r}
+# The imputed data
+imputed_data <- result$completeObs
+```
 
 
 
