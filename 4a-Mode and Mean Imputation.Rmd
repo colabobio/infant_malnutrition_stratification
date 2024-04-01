@@ -1,0 +1,131 @@
+---
+title: "Data Imputation (Mean and mode)"
+author: "Justin Guerra"
+date: "2024-04-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(magrittr)
+library(mice)
+library(missForest)
+library(missMDA)
+library(here) 
+```
+
+```{r}
+path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+dffile <- "cleaned.rda"
+load(file = here(path, dffile))
+dfc
+```
+
+```{r}
+na_count <- sum(is.na(dfc))
+na_count
+```
+## NAs in the dataset
+```{r}
+dfc %>% is.na() %>% colSums()
+```
+Various variables (binary, numeric, level variables) with NAs. Need to impute them.
+
+
+
+## Functions for Mode and Mean Imputation
+```{r}
+# Define a function for mode imputation
+mode_imputation <- function(x) {
+  # Check if the column contains only 0s, 1s, and NAs
+  unique_values <- unique(na.omit(x))
+  if (length(unique_values) == 2 && all(unique_values %in% c(0, 1))) {
+    mode_value <- names(sort(table(x), decreasing = TRUE))[1]  # Calculate the mode
+    x[is.na(x)] <- mode_value  # Replace NAs with mode
+  }
+  return(x)
+}
+
+# Define a function for mode imputation
+mode_imputation_fem_vars <- function(x) {
+  # Check if the column contains only the specified values and NAs
+  unique_values <- unique(na.omit(x))
+  allowed_values <- c(0.0, 1.0, 0.5)
+  
+  if (length(unique_values) == 3 && all(unique_values %in% allowed_values)) {
+    mode_value <- names(sort(table(x), decreasing = TRUE))[1]  # Calculate the mode
+    x[is.na(x)] <- mode_value  # Replace NAs with mode
+  }
+  
+  return(x)
+}
+
+# Function for mean imputation
+mean_imputation <- function(x) {
+  mean_value <- mean(x, na.rm = TRUE)  # Calculate the mean excluding NA values
+  x[is.na(x)] <- mean_value  # Replace NA values with the mean
+  return(x)
+}
+
+
+```
+
+```{r}
+dfc
+```
+
+```{r, echo=FALSE}
+#Counting the number of Nas
+print(paste0("The number of NAs that are left: ", dfc %>% is.na() %>% sum()))
+```
+
+
+Mode Imputation for most of the variables
+```{r}
+# Apply mode imputation to each column
+dfc_imputed <- lapply(dfc, mode_imputation)
+dfc_imputed <- as.data.frame(dfc_imputed)
+
+# Number of variables that have NAs
+dfc_imputed %>% is.na() %>% colSums()
+
+```
+```{r, echo=FALSE}
+#Counting the number of Nas
+print(paste0("The number of NAs that are left: ", dfc_imputed %>% is.na() %>% sum()))
+```
+
+
+fem_aut_hc,  fem_aut_large, fem_aut_daily, fem_aut_visits are level variables, the question is should it be imputed based on the mode of values?
+
+
+
+
+# Imputed female level variables with mode imputation
+```{r}
+# Apply mode imputation to each column
+dfc_imputed <- lapply(dfc_imputed, mode_imputation_fem_vars)
+dfc_imputed <- as.data.frame(dfc_imputed)
+
+dfc_imputed %>% is.na() %>% colSums()
+```
+Now we have only continuous variables left
+
+
+# Mean Imputation
+```{r}
+# Apply mean imputation to numeric columns
+numeric_cols <- sapply(dfc_imputed, is.numeric)  # Identify numeric columns
+dfc_imputed[, numeric_cols] <- lapply(dfc_imputed[, numeric_cols], mean_imputation)
+
+#Counting the number of Nas
+print(paste0("The number of NAs that are left: ", dfc_imputed %>% is.na() %>% sum()))
+```
+
+```{r}
+write.table(dfc_imputed,
+            file = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/quality_control/Mode_and_mean_imputed_table.txt",
+            quote = FALSE,
+            row.names = FALSE,
+            col.names = TRUE)
+```
+
