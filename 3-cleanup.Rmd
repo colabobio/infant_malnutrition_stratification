@@ -11,12 +11,10 @@ knitr::opts_chunk$set(echo = TRUE)
 # libraries needed
 library(here)       # to get R project path
 library(haven)      # to handle the haven_labelled columns
-library(mice)       # to impute missing data
 library(data.table) # for one-hot encoding
 library(mltools)    # for one-hot encoding
 library(tidyverse)  # most variable creation here uses tidyverse 
 library(dplyr)
-library(missMDA)
 ```
 
 ```{r}
@@ -59,11 +57,13 @@ convert_numeric_to_integer <- function(df, num_cols) {
 ```
 
 ```{r}
-#path <- "C:/Users/Arnav Gupta/R_Projects/infant_malnutrition_stratification/"
+#path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
 path <- "data/"
 dffile <- "recoded.rda"
 load(file = here(path, dffile))
+```
 
+```{r}
 rvfile <- "recoded-variables.txt"
 recoded_vars <- read.table(here(path, rvfile), header = FALSE)$V1
 ```
@@ -123,7 +123,6 @@ dfr[haven_labelled_cols] <- lapply(dfr[haven_labelled_cols], as.factor)
 factor_variables = var_class %>% dplyr::filter(variable_class == "factor") %>% dplyr::select(variable_name) %>% dplyr::pull()
 factor_variables
 ```
-
 
 ```{r}
 dfr <- convert_bin_factor_to_integer(dfr, factor_variables)
@@ -210,6 +209,7 @@ dfr <- dfr %>% select(-all_of(ciaf_scale_vars))
 ```{r}
 dfr
 ```
+
 ```{r}
 var_class <- get_class_of_columns(dfr)
 integer_variables = var_class %>% dplyr::filter(variable_class == "integer") %>% dplyr::select(variable_name) %>% dplyr::pull()
@@ -267,7 +267,6 @@ dfr <- dfr %>% select(-all_of(factor_variables))
 dfr
 ```
 
-
 ```{r}
 dfc <- cbind(dfr, onehot_encoding)
 var_class <- get_class_of_columns(dfc)
@@ -307,13 +306,45 @@ na_count <- sum(is.na(dfc))
 na_count
 ```
 
+
+## Precentage of missing values in the variables 
 ```{r}
-dfc_com <- na.omit(dfc)
-dfc_com
+missing_na_df = sapply(dfc, function(x) sum(is.na(x))) %>% as.data.frame() %>% rownames_to_column(var = "variable") 
+colnames(missing_na_df) = c("Variable", "Number of NAs")  
+missing_na_df_precentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` = as.integer(`Number of NAs` / as.numeric(nrow(dfc)) * 100)) %>% arrange(desc(`Number of NAs`))
+  missing_na_df_precentage
+```
+```{r}
+path <- "data/"
+nafile <- "percentageNA.csv"
+
+write.csv(x = missing_na_df_precentage,
+            file = here(path, nafile),
+          quote = FALSE,
+          row.names = FALSE,
+          col.names = TRUE)
 ```
 
 ```{r}
-#path <- "C:/Users/Arnav Gupta/R_Projects/infant_malnutrition_stratification/"
+precentage_cutoff <- 35
+
+HighPrecentageofNAs <- missing_na_df_precentage %>% 
+  dplyr::filter(`Percentage of NAs` > precentage_cutoff) %>% 
+  dplyr::select(Variable) %>% dplyr::pull()
+```
+
+```{r}
+dfc <- dfc %>% select(-all_of(HighPrecentageofNAs))
+dfc
+```
+
+```{r}
+na_count <- sum(is.na(dfc))
+na_count
+```
+
+```{r}
+#path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
 path <- "data/"
 dffile <- "cleaned.rda"
 save(dfc, file = here(path, dffile))

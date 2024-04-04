@@ -1,0 +1,98 @@
+---
+title: "Data imputation"
+author: "Justin Guerra, Arnav Gupta, Andres Colubri"
+output: html_document
+date: "2024-03-06"
+---
+
+```{r setup, include=FALSE}
+library(mice)
+library(here)
+library(missForest)
+library(dplyr)
+```
+
+```{r}
+path <- "data/"
+dffile <- "cleaned.rda"
+load(file = here(path, dffile))
+dfc
+sapply(dfc, function(x) sum(is.na(x)))
+```
+
+```{r}
+na_count <- sum(is.na(dfc))
+na_count
+```
+
+```{r}
+method <- c()
+for (col_name in names(dfc)) {
+  column <- dfc[[col_name]]
+  
+  is_binary <- all((column %in% c(0, 1)) | is.na(column))
+  
+  if (is_binary) {
+    method <- c(method, "mode")
+  } else {
+    method <- c(method, "mean")
+  }
+}
+
+method
+
+
+```
+
+```{r}
+# impr <- mice(dfc, m = 1, maxit = 1, method=method)
+# imputed_data <- missForest(dfc, method = "mean")
+
+
+
+#imputing using mean and mode
+imputed_data_mean <- dfc
+
+
+
+for (col in 1:ncol(imputed_data_mean)) {
+    if (method[col] == "mean") {
+
+    mean_val <- mean(imputed_data_mean[[col]], na.rm = TRUE)
+    imputed_data_mean[which(is.na(imputed_data_mean[,col]),arr.ind = TRUE), col] <-mean_val
+  } else if (method[col] == "mode") {
+    
+    mode_val <- names(sort(table(imputed_data_mean[[col]], useNA = "ifany"), decreasing = TRUE))[1]
+    ifelse()
+    
+    
+    imputed_data_mean[which(is.na(imputed_data_mean[,col]),arr.ind = TRUE), col] <- mode_val
+  }
+}
+
+
+ imputed_data_mean$full_vaccination %>% class()
+
+#sapply(imputed_data_mean, function(x) sum(is.na(x)))
+
+
+
+
+
+```
+
+
+```{r}
+
+#for (i in var_1_0s %>% names()) {
+
+  #c("logreg", "logreg", "","", "","","logreg","logreg", "logreg","logreg", "logreg", "logreg", "","logreg", "logreg","","","","", "","","","","logreg"))
+  
+  
+  
+  
+ # ifelse(test = var_1_0s[[i]] %in% c(0,1) ,TRUE, FALSE) %>% print()
+
+
+#}
+```
