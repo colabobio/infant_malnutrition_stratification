@@ -1,10 +1,9 @@
 ---
-title: "DHS data clean-up"
-author: "Justin Guerra, Arnav Gupta, Andres Colubri"
+title: "3.1 Justin_Cleanup_without_oneHotEncoding"
+author: "Justin Guerra"
+date: "2024-04-02"
 output: html_document
-date: "2024-03-06"
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -254,30 +253,18 @@ factor_variables = var_class %>% dplyr::filter(variable_class == "factor") %>% d
 print(factor_variables)
 ```
 
-```{r}
-onehot_encoding = one_hot(as.data.table(dfr[factor_variables]),
-        naCols = FALSE,
-        sparsifyNAs = FALSE,
-        dropUnusedLevels = TRUE)
-onehot_encoding
-```
+
 
 ```{r}
 dfr <- dfr %>% select(-all_of(factor_variables))
 dfr
 ```
 
-```{r}
-dfc <- cbind(dfr, onehot_encoding)
-var_class <- get_class_of_columns(dfc)
-unique(var_class$variable_class)
-names(dfc) <- make.names(names(dfc))
-```
 
 ```{r}
 const_vars <- c()
-for (var in colnames(dfc)) {
-  unique_values <- unique(dfc[[var]])
+for (var in colnames(dfr)) {
+  unique_values <- unique(dfr[[var]])
   contains_NA <- any(is.na(unique_values))
   
   if ((length(unique_values) == 1) || ((length(unique_values) == 2) && contains_NA))  {
@@ -288,30 +275,30 @@ for (var in colnames(dfc)) {
 }
 print("Removing constant variables")
 print(const_vars)
-dfc <- dfc %>% select(-all_of(const_vars))
+dfr <- dfr %>% select(-all_of(const_vars))
 ```
 
 ```{r}
-dfc
+dfr
 ```
 
 ```{r}
-formula_string <- paste(colnames(dfc), collapse = " + ")
+formula_string <- paste(colnames(dfr), collapse = " + ")
 formula_string <- paste0("~", formula_string)
 formula_string
 ```
 
 ```{r}
-na_count <- sum(is.na(dfc))
+na_count <- sum(is.na(dfr))
 na_count
 ```
 
 
 ## Precentage of missing values in the variables 
 ```{r}
-missing_na_df = sapply(dfc, function(x) sum(is.na(x))) %>% as.data.frame() %>% rownames_to_column(var = "variable") 
+missing_na_df = sapply(dfr, function(x) sum(is.na(x))) %>% as.data.frame() %>% rownames_to_column(var = "variable") 
 colnames(missing_na_df) = c("Variable", "Number of NAs")  
-missing_na_df_precentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` = as.integer(`Number of NAs` / as.numeric(nrow(dfc)) * 100)) %>% 
+missing_na_df_precentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` = as.integer(`Number of NAs` / as.numeric(nrow(dfr)) * 100)) %>% 
   arrange(desc(`Number of NAs`))
   missing_na_df_precentage
 ```
@@ -319,7 +306,7 @@ missing_na_df_precentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` =
 ```{r}
 path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
 # path <- "data/DHS-2019-21/"
-nafile <- "percentageNA.csv"
+nafile <- "percentageNA_without_OneHotEncoding.csv"
 
 write.csv(x = missing_na_df_precentage,
             file = here(path, nafile),
@@ -337,19 +324,19 @@ HighPrecentageofNAs <- missing_na_df_precentage %>%
 ```
 
 ```{r}
-dfc <- dfc %>% select(-all_of(HighPrecentageofNAs))
-dfc
+dfr <- dfr %>% select(-all_of(HighPrecentageofNAs))
+dfr
 ```
 
 
 ```{r}
-na_count <- sum(is.na(dfc))
+na_count <- sum(is.na(dfr))
 na_count
 ```
 
 ```{r}
 path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
 # path <- "data/DHS-2019-21/"
-dffile <- "cleaned.rda"
-save(dfc, file = here(path, dffile))
+dffile <- "cleaned_without_onehotEncoding.rda"
+save(dfr, file = here(path, dffile))
 ```
