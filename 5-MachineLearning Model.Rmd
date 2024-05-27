@@ -1,0 +1,117 @@
+---
+title: "RandomForest Machine Learning"
+author: "Arnav Gupta"
+date: "2024-05-13"
+output: html_document
+---
+```{r setup, include=FALSE}
+
+library(randomForest)
+library(nnet)
+library(caret)
+library(here)
+library(dplyr)
+library(doParallel) 
+library(keras)
+
+```
+
+```{r}
+path <- "C:/Users/Arnav Gupta/R_Projects/infant_malnutrition_stratification/data"
+dffile <- "imputed_data_without_onehotEncoding.rda"
+load(file = here(path, dffile))
+imputed_dfr
+```
+
+```{r}
+
+imputed_dfr$ciaf <- as.factor(imputed_dfr$ciaf)
+
+# Splitting the data into training and testing sets: 80-20
+
+trainIndex <- createDataPartition(imputed_dfr$ciaf, p = 0.8, list = FALSE)
+trainData <- imputed_dfr[trainIndex, ]
+testData <- imputed_dfr[-trainIndex, ]
+
+
+
+
+```
+
+```{r}
+#random forest model
+# rf_model <- randomForest(ciaf ~ ., data = trainData, importance = TRUE, ntree = 500)
+# 
+# ctrl <- trainControl(method = "repeatedcv", number = 2, repeats = 3, allowParallel = TRUE)
+# 
+# tuneGrid <- expand.grid(.size = c(5, 10), .decay = c(0.01, 0.1))
+# 
+# # neural nettwork model
+# nn_model <- train(ciaf ~ ., data = trainData, method = "nnet",
+#                   trControl = ctrl, tuneGrid = tuneGrid,
+#                   linout = FALSE, trace = FALSE, maxit = 10)
+
+x_train <- as.matrix(trainData[, -which(names(trainData) == "ciaf")])
+y_train <- trainData$ciaf
+x_test <- as.matrix(testData[, -which(names(testData) == "ciaf")])
+y_test <- testData$ciaf
+
+
+
+model <- keras_model_sequential() %>%
+  layer_dense(units = 16, activation = 'relu', input_shape = ncol(trainData) - 1) %>%
+  layer_dense(units = 8, activation = 'relu') %>%
+  layer_dense(units = 1, activation = 'sigmoid')
+
+# model %>% compile(
+#   loss = 'binary_crossentropy',
+#   optimizer = optimizer_adam(),
+#   metrics = c('accuracy')
+# )
+
+model %>% compile(
+  optimizer = optimizer_rmsprop(learning_rate = 0.01),
+  loss = "categorical_crossentropy",
+  metrics = list("categorical_accuracy")
+)
+
+
+history <- model %>% fit(
+  as.matrix(trainData[, -which(names(trainData) == "ciaf")]), trainData$ciaf,
+  epochs = 100, batch_size = 32, validation_split = 0.2
+)
+```
+
+
+```{r}
+score <- model %>% evaluate(as.matrix(testData[, -which(names(testData) == "ciaf")]), testData$ciaf)
+cat('Test accuracy:', score$acc, '\n')
+
+nn_predictions <- model %>% predict_classes(as.matrix(testData[, -which(names(testData) == "ciaf")]))
+confusionMatrix(as.factor(nn_predictions), as.factor(testData$ciaf))
+
+
+```
+
+```{r}
+#Evaluate model on testData
+
+# predictions <- predict(rf_model, testData)
+# 
+# confusionMatrix(predictions, testData$ciaf)
+# 
+# varImpPlot(rf_model)
+
+```
+
+```{r}
+
+model_path <- "C:/Users/Arnav Gupta/R_Projects/infant_malnutrition_stratification/models"
+model_file <- "rf_model_ciaf.rda"
+save(rf_model, file = here(model_path, model_file))
+
+```
+
+
+
+

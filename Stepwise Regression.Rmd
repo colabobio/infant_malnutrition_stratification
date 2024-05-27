@@ -1,0 +1,47 @@
+---
+title: "Stepwise Regression"
+author: "Arnav Gupta"
+date: "2024-05-13"
+output: html_document
+---
+```{r}
+path <- "C:/Users/Arnav Gupta/R_Projects/infant_malnutrition_stratification/data"
+dffile <- "imputed_data_without_onehotEncoding.rda"
+load(file = here(path, dffile))
+imputed_dfr
+```
+
+
+```{r}
+# Initialize model
+forward_model <- lm(ciaf ~ ., data = imputed_dfr)
+
+
+forward_model <- step(forward_model, direction = "forward", scope = formula(~ .))
+```
+
+```{r}
+
+
+
+
+
+abline(lm(ciaf ~ hp, data = imputed_dfr), col = "black", lwd = 2)
+points(sort(imputed_dfr$child_age), intercept_model$fitted.values, col = "purple", pch = 20)
+points(sort(imputed_dfr$stunt_waste), forward_model$fitted.values, col = "red", pch = 20)
+points(sort(imputed_dfr$maternal_height_cm), backward_model$fitted.values, col = "blue", pch = 20)
+points(sort(imputed_dfr$icfi_bottlefeed_score), both_model$fitted.values, col = "green", pch = 20)
+
+legend(
+  "topright", 
+  legend = c(
+    "Intercept Only", 
+    "Forward", 
+    "Backward", 
+    "Both-Direction"
+    ),
+  col = c("red", "blue", "green"), pch = 20
+)
+```
+
+
