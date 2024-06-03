@@ -1,5 +1,5 @@
 ---
-title: "Data Imputation from Emperical Distribution"
+title: "Data Imputation from Emperical Distribution Without Factor Variables"
 author: "Justin Guerra"
 date: "2024-04-15"
 output: html_document
@@ -11,6 +11,9 @@ library(missForest)
 library(missMDA)
 library(magrittr)
 library(here) 
+library(dplyr)
+library(purrr)
+library(fastDummies)
 ```
 
 https://chat.openai.com/share/bdcba433-a038-4d85-9119-02b17f98e2e4
@@ -18,8 +21,10 @@ https://chat.openai.com/share/bdcba433-a038-4d85-9119-02b17f98e2e4
 # Loading in the cleaned data without one hot encoding
 ```{r}
 path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-dffile <- "cleaned_without_onehotEncoding.rda"
+dffile <- "cleaned_without_onehotEncoding_without_factor_variables.rda"
 load(file = here(path, dffile))
+dfr = dfr %>% dplyr::select(-c("dist_wasted_decile"))
+
 dfr
 ```
 ## Functions for imputing missing values (and visualizing them)
@@ -70,34 +75,43 @@ imputed_dfr
 ```{r}
 imputed_dfr %>% is.na() %>% colSums() # check over the number of missing values
 ```
+```{r}
+# factor_vars <- names(imputed_dfr)[sapply(imputed_dfr, is.factor)]
+# 
+# 
+# df_one_hot <- dummy_cols(imputed_dfr, select_columns = factor_vars, remove_first_dummy = FALSE, remove_selected_columns = TRUE)
+# 
+# 
+# df_one_hot
+```
+
+
 
 
 
 # Histogram distribution of the imputed missing values
 ```{r}
-histo_dir = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/missingNA Imputation with emperical distribution/"
-width = 10
-height = 10 
-
-histogram <- vector(mode = "list")
-for(variable in dfr_naindices %>% names()){
- 
- #Histogram on the formerly missing values
- histogram[[variable]] = imputed_dfr[dfr_naindices[[variable]][[1]], variable] %>% 
-  dplyr::pull() %>% hist(main = paste0("Histogram of Imputed Variable (Emperical Distribution): ", variable))
- 
- histogram[[variable]] %>% print() 
- 
- # ggsave(paste0(variable, "_NAHistogram.pdf"), width = width,device = "pdf", height = height, 
- #        path =histo_dir)
- # 
- # histogram[[variable]] %>% print()
- # 
- # dev.off()
-   
-}
-
-
+# histo_dir = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/missingNA Imputation with emperical distribution/"
+# width = 10
+# height = 10 
+# 
+# histogram <- vector(mode = "list")
+# for(variable in dfr_naindices %>% names()){
+#  
+#  #Histogram on the formerly missing values
+#  histogram[[variable]] = imputed_dfr[dfr_naindices[[variable]][[1]], variable] %>% 
+#   dplyr::pull() %>% hist(main = paste0("Histogram of Imputed Variable (Emperical Distribution): ", variable))
+#  
+#  histogram[[variable]] %>% print() 
+#  
+#  # ggsave(paste0(variable, "_NAHistogram.pdf"), width = width,device = "pdf", height = height, 
+#  #        path =histo_dir)
+#  # 
+#  # histogram[[variable]] %>% print()
+#  # 
+#  # dev.off()
+#    
+# }
 ```
 
 # Save the new data

@@ -1,11 +1,14 @@
 ---
-title: "3.1 Justin_Cleanup_without_oneHotEncoding"
+title: "3.a Justin_Cleanup_without_oneHotEncoding_without_factor_variables"
 author: "Justin Guerra"
-date: "2024-04-02"
+date: "2024-06-03"
 output: html_document
 ---
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
 
 # libraries needed
 library(here)       # to get R project path
@@ -337,6 +340,6 @@ na_count
 ```{r}
 path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
 # path <- "data/DHS-2019-21/"
-dffile <- "cleaned_without_onehotEncoding.rda"
+dffile <- "cleaned_without_onehotEncoding_without_factor_variables.rda"
 save(dfr, file = here(path, dffile))
 ```

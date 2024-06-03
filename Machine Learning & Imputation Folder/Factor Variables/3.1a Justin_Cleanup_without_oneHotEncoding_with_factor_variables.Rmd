@@ -1,0 +1,344 @@
+---
+title: "3.1 Justin_Cleanup_without_oneHotEncoding"
+author: "Justin Guerra"
+date: "2024-04-02"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+
+# libraries needed
+library(here)       # to get R project path
+library(haven)      # to handle the haven_labelled columns
+library(data.table) # for one-hot encoding
+library(mltools)    # for one-hot encoding
+library(tidyverse)  # most variable creation here uses tidyverse 
+library(dplyr)
+```
+
+```{r}
+# Some utilities
+
+get_class_of_columns <- function(df) {
+  col_names <- colnames(df)
+  classes <- df %>% sapply(class)
+  col_class <- c()
+  for (name in col_names) {
+    c <- classes[[name]]
+    ccl <- c[1]
+    col_class <- append(col_class, ccl)
+  }
+  df_class <- data.frame(variable_name = col_names, variable_class = col_class)
+  return(df_class)
+}
+
+convert_bin_factor_to_integer <- function(df, fac_cols) {
+  for (col_name in fac_cols) {
+    # Check if the column is a factor and only contains 0 and 1
+    if (is.factor(df[[col_name]]) && all(levels(df[[col_name]]) %in% c("0", "1"))) {
+      print(paste0("Converting ", col_name, " into integer"))
+      df[[col_name]] <- as.integer(as.character(df[[col_name]]))
+    }
+  }
+  return(df)
+}
+
+convert_numeric_to_integer <- function(df, num_cols) {
+  for (col_name in num_cols) {
+    # Check if the column only contains integers or NAs
+    if (all(is.na(df[[col_name]]) | df[[col_name]] == floor(df[[col_name]]))) {
+      print(paste0("Converting ", col_name, " into integer"))
+      df[[col_name]] <- as.integer(df[[col_name]])
+    }
+  }
+  return(df)
+}
+```
+
+```{r}
+path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+#path <- "data/DHS-2019-21/"
+dffile <- "recoded.rda"
+load(file = here(path, dffile))
+```
+
+```{r}
+rvfile <- "recoded-variables.txt"
+recoded_vars <- read.table(here(path, rvfile), header = FALSE)$V1
+```
+
+```{r}
+for (col in recoded_vars) {
+  if (!col %in% colnames(df)) {
+    print(paste0("Column ",col, " is missing!"))
+  }
+}
+```
+
+```{r}
+dfr <- df[recoded_vars]
+dfr
+```
+
+
+```{r}
+var_class <- get_class_of_columns(dfr)
+var_class
+```
+
+```{r}
+unique(var_class$variable_class)
+```
+
+```{r}
+character_variables = var_class %>% dplyr::filter(variable_class == "character") %>% dplyr::select(variable_name) %>% dplyr::pull()
+character_variables
+
+# Converting character variables into factor
+dfr[sapply(dfr, is.character)] <- lapply(dfr[sapply(dfr, is.character)], as.factor)
+dfr
+```
+
+```{r}
+numeric_variables = var_class %>% dplyr::filter(variable_class == "numeric") %>% dplyr::select(variable_name) %>% dplyr::pull()
+numeric_variables
+```
+```{r}
+integer_variables = var_class %>% dplyr::filter(variable_class == "integer") %>% dplyr::select(variable_name) %>% dplyr::pull()
+integer_variables
+```
+
+```{r}
+haven_variables = var_class %>% dplyr::filter(variable_class == "haven_labelled") %>% dplyr::select(variable_name) %>% dplyr::pull()
+haven_variables
+```
+
+```{r}
+haven_labelled_cols <- sapply(dfr, function(x) inherits(x, "haven_labelled"))
+dfr[haven_labelled_cols] <- lapply(dfr[haven_labelled_cols], as.factor)
+```
+
+```{r}
+factor_variables = var_class %>% dplyr::filter(variable_class == "factor") %>% dplyr::select(variable_name) %>% dplyr::pull()
+factor_variables
+```
+
+```{r}
+dfr <- convert_bin_factor_to_integer(dfr, factor_variables)
+dfr <- convert_numeric_to_integer(dfr, numeric_variables)
+```
+
+```{r}
+# Remove columns that contain all NAs
+dfr <- dfr %>% select(where(~ any(!is.na(.))))
+
+# Remove constant columns
+dfr <- dfr %>% select(where(~ !all(duplicated(.x)[-1L])))
+```
+
+```{r}
+var_class <- get_class_of_columns(dfr)
+unique(var_class$variable_class)
+```
+
+```{r}
+dfr
+```
+
+```{r}
+unique(dfr$iron_3mo)
+```
+
+```{r}
+unk_vars <- c("anthro_measured",
+              "height_position", 
+              "last_child_id", 
+              "multiplet",
+              "covariate_nonmissing")
+
+measure_vars <- c("haz", 
+                  "waz", 
+                  "whz", 
+                  "bmiz")
+
+redundant_vars <- c("stunted",
+                    "underweight",
+                    "wasted",
+                    "siblings_2",
+                    "siblings_bin",
+                    "age_group",
+                    "age_group_5y",
+                    "female")
+
+geo_vars <- c("state",
+              "state_ciaf_rank",
+              "state_zones",
+              "eag_state",
+              "priority_state",
+              "priority_state_bin",
+              "focus_states",
+              "Northeast_focus",
+              "Other_Focus")
+
+ciaf_scale_vars <- c("scale_ciaf1_house",
+                     "scale_ciaf1_mheight",
+                     "scale_ciaf1_medu",
+                     "scale_ciaf1_toilet",
+                     "scale_ciaf1_zone",
+                     "scale_ciaf1_fuel",
+                     "scale_ciaf1_female",
+                     "scale_ciaf1_caste",
+                     "scale_ciaf1_priority",
+                     "score_ciaf1")
+
+#other_ciaf_vars <- c("dist_ciaf_mean",
+#                     "mean_ciaf_dist",
+#                     "dist_ciaf_decile",
+#                     "ciaf_decile")
+
+# Remove the columns from dfr
+dfr <- dfr %>% select(-all_of(unk_vars))
+dfr <- dfr %>% select(-all_of(measure_vars))
+dfr <- dfr %>% select(-all_of(redundant_vars))
+dfr <- dfr %>% select(-all_of(geo_vars))
+dfr <- dfr %>% select(-all_of(ciaf_scale_vars))
+#dfr <- dfr %>% select(-all_of(other_ciaf_vars))
+```
+
+```{r}
+dfr
+```
+
+```{r}
+var_class <- get_class_of_columns(dfr)
+integer_variables = var_class %>% dplyr::filter(variable_class == "integer") %>% dplyr::select(variable_name) %>% dplyr::pull()
+numeric_variables = var_class %>% dplyr::filter(variable_class == "numeric") %>% dplyr::select(variable_name) %>% dplyr::pull()
+factor_variables = var_class %>% dplyr::filter(variable_class == "factor") %>% dplyr::select(variable_name) %>% dplyr::pull()
+```
+
+```{r}
+for (var in factor_variables) {
+  levels <- levels(dfr[[var]])
+  if (length(levels) < 3) {
+    print(var)
+    print(levels)
+    print("Converting to integer")
+    val <- 0
+    for (level in levels) {
+      dfr[[var]] <- gsub(level, val, dfr[[var]]) 
+      val <- val + 1
+    }
+    dfr[[var]] <- as.integer(dfr[[var]])
+  }
+}
+```
+
+```{r}
+dfr <- dfr %>% filter(eligch == 1, defacto_child == 1)
+```
+
+```{r}
+dfr <- dfr %>% select(-all_of(c("eligch", "defacto_child")))
+dfr
+```
+
+```{r}
+var_class <- get_class_of_columns(dfr)
+integer_variables = var_class %>% dplyr::filter(variable_class == "integer") %>% dplyr::select(variable_name) %>% dplyr::pull()
+numeric_variables = var_class %>% dplyr::filter(variable_class == "numeric") %>% dplyr::select(variable_name) %>% dplyr::pull()
+factor_variables = var_class %>% dplyr::filter(variable_class == "factor") %>% dplyr::select(variable_name) %>% dplyr::pull()
+```
+
+```{r}
+print(factor_variables)
+```
+
+
+
+```{r}
+# dfr <- dfr %>% select(-all_of(factor_variables))
+# dfr
+```
+
+
+```{r}
+const_vars <- c()
+for (var in colnames(dfr)) {
+  unique_values <- unique(dfr[[var]])
+  contains_NA <- any(is.na(unique_values))
+  
+  if ((length(unique_values) == 1) || ((length(unique_values) == 2) && contains_NA))  {
+      print(var)
+      print(unique_values)
+      const_vars <- c(const_vars, var)
+  }
+}
+print("Removing constant variables")
+print(const_vars)
+dfr <- dfr %>% select(-all_of(const_vars))
+```
+
+```{r}
+dfr
+```
+
+```{r}
+formula_string <- paste(colnames(dfr), collapse = " + ")
+formula_string <- paste0("~", formula_string)
+formula_string
+```
+
+```{r}
+na_count <- sum(is.na(dfr))
+na_count
+```
+
+
+## Precentage of missing values in the variables 
+```{r}
+missing_na_df = sapply(dfr, function(x) sum(is.na(x))) %>% as.data.frame() %>% rownames_to_column(var = "variable") 
+colnames(missing_na_df) = c("Variable", "Number of NAs")  
+missing_na_df_precentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` = as.integer(`Number of NAs` / as.numeric(nrow(dfr)) * 100)) %>% 
+  arrange(desc(`Number of NAs`))
+  missing_na_df_precentage
+```
+
+```{r}
+path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+# path <- "data/DHS-2019-21/"
+nafile <- "percentageNA_without_OneHotEncoding.csv"
+
+write.csv(x = missing_na_df_precentage,
+            file = here(path, nafile),
+          quote = FALSE,
+          row.names = FALSE,
+          col.names = TRUE)
+```
+
+```{r}
+precentage_cutoff <- 35
+
+HighPrecentageofNAs <- missing_na_df_precentage %>% 
+  dplyr::filter(`Percentage of NAs` > precentage_cutoff) %>% 
+  dplyr::select(Variable) %>% dplyr::pull()
+```
+
+```{r}
+dfr <- dfr %>% select(-all_of(HighPrecentageofNAs))
+dfr
+```
+
+
+```{r}
+na_count <- sum(is.na(dfr))
+na_count
+```
+
+```{r}
+path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
+# path <- "data/DHS-2019-21/"
+dffile <- "cleaned_without_onehotEncoding_with_factor_variables.rda"
+save(dfr, file = here(path, dffile))
+```
