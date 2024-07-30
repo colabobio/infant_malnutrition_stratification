@@ -21,6 +21,7 @@ library(ROCit)
 library(pROC)
 library(ggplot2)
 library(properties)
+library(ResourceSelection)
 ```
 
 ```{r message=FALSE, cache=F}
@@ -137,10 +138,35 @@ print(cal_c0)
 
 roc_plot(data0$ciaf, prob0, dir = mdl_folder0, fn = "roc_plot.pdf")
 ```
+
 ```{r}
 plot_roc_perf(plot_data0$out, plot_data0$prob)
 ```
 
 ```{r}
 conf_matrix(plot_data0$out, plot_data0$prob, 0.5, mdl_folder0, "conf_matrix.txt")
+```
+
+```{r}
+# Hosmer-Lemeshow goodness of fit table for distribution of observed CIAF prevalence vs predicted prevalence
+hosmerlem <- hoslem_test <- hoslem.test(data0$ciaf, prob0, g=10)
+hl_table <- data.frame(
+  Observed = hoslem_test$observed,
+  Expected = hoslem_test$expected,
+  Observed_Positive = hoslem_test$observed[,2],
+  Expected_Positive = hoslem_test$expected[,2]
+)
+hosmerlem
+print(hl_table)
+```
+```{r}
+hl_file <- here(mdl_folder0, "hl_table.csv")
+write.csv(hl_table, hl_file, row.names=FALSE)
+```
+
+```{r}
+# Generating calibration curve using the CalibrationCurves package
+# https://cran.r-project.org/web/packages/CalibrationCurves/vignettes/CalibrationCurves.html
+
+calPerf = val.prob.ci.2(prob0, data0$ciaf)
 ```
