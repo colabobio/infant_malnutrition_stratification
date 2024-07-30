@@ -15,6 +15,12 @@ library(data.table) # for one-hot encoding
 library(mltools)    # for one-hot encoding
 library(tidyverse)  # most variable creation here uses tidyverse 
 library(dplyr)
+library(properties)
+```
+
+```{r}
+prop <- read.properties("data.properties")
+data_folder <- prop$data_folder
 ```
 
 ```{r}
@@ -57,15 +63,13 @@ convert_numeric_to_integer <- function(df, num_cols) {
 ```
 
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-#path <- "data/DHS-2019-21/"
-dffile <- "recoded.rda"
-load(file = here(path, dffile))
+dffile <- here(data_folder, "recoded.rda")
+load(file=dffile)
 ```
 
 ```{r}
-rvfile <- "recoded-variables.txt"
-recoded_vars <- read.table(here(path, rvfile), header = FALSE)$V1
+rvfile <- here(data_folder, "recoded-variables.txt")
+recoded_vars <- read.table(rvfile, header = FALSE)$V1
 ```
 
 ```{r}
@@ -80,7 +84,6 @@ for (col in recoded_vars) {
 dfr <- df[recoded_vars]
 dfr
 ```
-
 
 ```{r}
 var_class <- get_class_of_columns(dfr)
@@ -104,6 +107,7 @@ dfr
 numeric_variables = var_class %>% dplyr::filter(variable_class == "numeric") %>% dplyr::select(variable_name) %>% dplyr::pull()
 numeric_variables
 ```
+
 ```{r}
 integer_variables = var_class %>% dplyr::filter(variable_class == "integer") %>% dplyr::select(variable_name) %>% dplyr::pull()
 integer_variables
@@ -144,10 +148,6 @@ unique(var_class$variable_class)
 
 ```{r}
 dfr
-```
-
-```{r}
-unique(dfr$iron_3mo)
 ```
 
 ```{r}
@@ -306,9 +306,9 @@ na_count <- sum(is.na(dfc))
 na_count
 ```
 
-
-## Precentage of missing values in the variables 
 ```{r}
+# Precentage of missing values in the variables
+
 missing_na_df = sapply(dfc, function(x) sum(is.na(x))) %>% as.data.frame() %>% rownames_to_column(var = "variable") 
 colnames(missing_na_df) = c("Variable", "Number of NAs")  
 missing_na_df_precentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` = as.integer(`Number of NAs` / as.numeric(nrow(dfc)) * 100)) %>% 
@@ -317,15 +317,12 @@ missing_na_df_precentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` =
 ```
 
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-# path <- "data/DHS-2019-21/"
-nafile <- "percentageNA.csv"
-
-write.csv(x = missing_na_df_precentage,
-            file = here(path, nafile),
-          quote = FALSE,
-          row.names = FALSE,
-          col.names = TRUE)
+nafile <- here(data_folder, "percentageNA.csv")
+write.csv(x=missing_na_df_precentage,
+          file=nafile,
+          quote=FALSE,
+          row.names=FALSE,
+          col.names=TRUE)
 ```
 
 ```{r}
@@ -341,15 +338,12 @@ dfc <- dfc %>% select(-all_of(HighPrecentageofNAs))
 dfc
 ```
 
-
 ```{r}
 na_count <- sum(is.na(dfc))
 na_count
 ```
 
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-# path <- "data/DHS-2019-21/"
-dffile <- "cleaned.rda"
-save(dfc, file = here(path, dffile))
+dffile <- here(data_folder, "cleaned.rda")
+save(dfc, file=dffile)
 ```

@@ -2,7 +2,7 @@
 title: "DHS data recoding"
 author: "Justin Guerra, Arnav Gupta, Andres Colubri"
 output: html_document
-date: "2024-03-06"
+date: "2024-07-30"
 ---
 
 From Stata to R
@@ -19,24 +19,26 @@ library(tidyverse)  # most variable creation here uses tidyverse
 library(tidyselect) # used to select variables in FP_EVENTS.R
 library(haven)      # used for Haven labeled DHSvariables
 library(labelled)   # used for Haven labeled variable creation
-library(expss)    # for creating tables with Haven labeled df
+library(expss)      # for creating tables with Haven labeled df
 library(readxl)     # for exporting to excel
-library(naniar)   # to use replace_with_na function
+library(naniar)     # to use replace_with_na function
 library(here)       # to get R project path
 library(sjlabelled) # to set variables label
-library(survey)  # to calculate weighted ratio for GAR
+library(survey)     # to calculate weighted ratio for GAR
 library(Hmisc)
 library(tidyr)
-
+library(properties)
 ```
 
 ```{r}
-#path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-path <- "data/DHS-2019-21/"
-datafile <- "merged.rda"
-load(paste0(path, datafile))
+prop <- read.properties("data.properties")
+data_folder <- prop$data_folder
 ```
 
+```{r}
+datafile <- here(data_folder, "merged.rda") 
+load(datafile)
+```
 
 **** Some utilities
 
@@ -448,9 +450,6 @@ df$ciaf[df$stunted == 1 | df$wasted == 1 | df$underweight == 1] <- 1
 # Replace missing values with NA
 df$ciaf[is.na(df$stunted) | is.na(df$wasted) | is.na(df$underweight)] <- NA
 
-# Convert to factor
-df$ciaf <- as.factor(df$ciaf)
-
 recoded_vars <- append(recoded_vars, "ciaf")
 ```
 
@@ -781,12 +780,10 @@ if ("icfi_breastmilk_score" %in% colnames(df)) {
 #     TRUE ~ NA_real_
 #   ))
 
+df$icfi_breastmilk_score <- NA
 df$icfi_breastmilk_score[df$child_age >= 6 & df$child_age <= 60 & is.na(df$still_breastfed)] <- 0
-
 df$icfi_breastmilk_score[df$still_breastfed == 1 & df$child_age >= 6 & df$child_age <= 12] <- 2
-
 df$icfi_breastmilk_score[df$still_breastfed == 1 & df$child_age > 12 & df$child_age <= 60] <- 1
-
 df$icfi_breastmilk_score <- as.factor(df$icfi_breastmilk_score)
 
 recoded_vars <- append(recoded_vars, "icfi_breastmilk_score")
@@ -808,9 +805,9 @@ if ("icfi_bottlefeed_score" %in% colnames(df)) {
 #   mutate(icfi_bottlefeed_score = if_else(child_age >= 6 & child_age <= 60 & m38 == 0, 1,
 #                                          if_else(child_age >= 6 & child_age <= 60 & m38 == 1, 0, NA_real_)))
 
+df$icfi_bottlefeed_score <- NA
 df$icfi_bottlefeed_score[df$child_age >= 6 & df$child_age <= 60 & df$m38 == 0] <- 1
 df$icfi_bottlefeed_score[df$child_age >= 6 & df$child_age <= 60 & df$m38 == 1] <- 0
-
 df$icfi_bottlefeed_score <- df$icfi_bottlefeed_score %>% as.factor()
 
 recoded_vars <- append(recoded_vars, "icfi_bottlefeed_score")
@@ -832,10 +829,9 @@ if ("icfi_starchy_staples_score" %in% colnames(df)) {
 #   mutate(icfi_starchy_staples_score = if_else(child_age >= 6 & child_age <= 24, 0,
 #                                               if_else((v412a == 1 | v412b == 1 | v414e == 1 | v414f == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
-
+df$icfi_starchy_staples_score <- NA
 df$icfi_starchy_staples_score[df$child_age >= 6 & df$child_age <= 24] <- 0
 df$icfi_starchy_staples_score[(df$v412a == 1 | df$v412b == 1 | df$v414e == 1 | df$v414f == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_starchy_staples_score <- df$icfi_starchy_staples_score %>% as.factor()
 
 recoded_vars <- append(recoded_vars, "icfi_starchy_staples_score")
@@ -857,9 +853,9 @@ if ("icfi_lentils_score" %in% colnames(df)) {
 #   mutate(icfi_lentils_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                       if_else(v414o == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_lentils_score <- NA
 df$icfi_lentils_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_lentils_score[df$v414o == 1 & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_lentils_score <- df$icfi_lentils_score %>% as.factor()
 
 recoded_vars <- append(recoded_vars, "icfi_lentils_score")
@@ -882,9 +878,9 @@ if ("icfi_milk_score" %in% colnames(df)) {
 #   mutate(icfi_milk_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                    if_else(v411 == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_milk_score <- NA
 df$icfi_milk_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_milk_score[df$v411 == 1 & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_milk_score <- as.factor(df$icfi_milk_score)
 
 recoded_vars <- append(recoded_vars, "icfi_milk_score")
@@ -906,9 +902,9 @@ if ("icfi_dairy_score" %in% colnames(df)) {
 #   mutate(icfi_dairy_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                     if_else((v414p == 1 | v414q == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_dairy_score <- NA
 df$icfi_dairy_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_dairy_score[(df$v414p == 1 | df$v414q == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_dairy_score <- df$icfi_dairy_score %>% as.factor()
 
 recoded_vars <- append(recoded_vars, "icfi_dairy_score")
@@ -931,9 +927,9 @@ if ("icfi_meat_score" %in% colnames(df)) {
 #   mutate(icfi_meat_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                    if_else((v414a == 1 | v414m == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_meat_score <- NA
 df$icfi_meat_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_meat_score[(df$v414a == 1 | df$v414m == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_meat_score <- as.factor(df$icfi_meat_score)
 
 recoded_vars <- append(recoded_vars, "icfi_meat_score")
@@ -957,6 +953,7 @@ if ("icfi_eggs_fish_score" %in% colnames(df)) {
 #                                         if_else((v414g == 1 | v414n == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_))) %>%
 #   mutate(icfi_meat_score = if_else(icfi_eggs_fish_score == 1, 1, icfi_meat_score))
 
+df$icfi_eggs_fish_score <- NA
 df$icfi_eggs_fish_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_eggs_fish_score[(df$v414g == 1 | df$v414n == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
 
@@ -987,9 +984,9 @@ if ("icfi_vitA_score" %in% colnames(df)) {
 #   mutate(icfi_vitA_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                    if_else((v414i == 1 | v414j == 1 | v414k == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_vitA_score <- NA
 df$icfi_vitA_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_vitA_score[(df$v414i == 1 | df$v414j == 1 | df$v414k == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_vitA_score <- as.factor(df$icfi_vitA_score)
 
 recoded_vars <- append(recoded_vars, "icfi_vitA_score")
@@ -1011,9 +1008,9 @@ if ("icfi_other_fruits_score" %in% colnames(df)) {
 #   mutate(icfi_other_fruits_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                            if_else(v414l == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_other_fruits_score <- NA
 df$icfi_other_fruits_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_other_fruits_score[df$v414l == 1 & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_other_fruits_score <- as.factor(df$icfi_other_fruits_score)
 
 recoded_vars <- append(recoded_vars, "icfi_other_fruits_score")
@@ -1263,11 +1260,12 @@ df$cooking_fuel <- case_when(
   TRUE ~ NA_real_
 ) %>% as.factor()
 
-levels(df$cooking_fuel) <- c("0. solid fuel", "1. non-solid fuel")
+df$cooking_fuel_solid <- ifelse(df$cooking_fuel == 0, 1, 0) %>% as.factor()
+recoded_vars <- append(recoded_vars, "cooking_fuel_solid")
 
+levels(df$cooking_fuel) <- c("0. solid fuel", "1. non-solid fuel")
 recoded_vars <- append(recoded_vars, "cooking_fuel")
 ```
-
 
 capture drop kitchen
 gen kitchen = hv242
@@ -1287,15 +1285,10 @@ df <- df %>%
 df$kitchen <- as.factor(df$kitchen)
 
 recoded_vars <- append(recoded_vars, "kitchen")
-```
 
-
-```{r}
 df$separate_kitchen_no <- ifelse(df$kitchen == 0, 1,0)  %>% as.factor()
-
 recoded_vars <- append(recoded_vars, "separate_kitchen_no")
 ```
-
 
 
 capture drop air_quality //Basani et al 2010, from Subramanian
@@ -2423,6 +2416,7 @@ if ("use_soap" %in% names(df)) {
 # df$use_soap <- case_when(is.na(df$use_soap)  ~ 1,
 #                          TRUE ~ 0) %>% as.factor()
 
+df$use_soap <- NA
 df$use_soap[df$hv230a < 3] <- 0
 df$use_soap[df$hv232 == 1] <- 1
 df$use_soap <- df$use_soap %>% as.factor()
@@ -2878,9 +2872,6 @@ capture drop score_ciaf1
 egen score_ciaf1 = rowtotal(scale_ciaf1*)
 
 ```{r}
-# Assuming your data is in a data frame named 'df'
-# Replace 'df' with the name of your data frame
-
 # Drop score_ciaf1 column if it exists
 if("score_ciaf1" %in% names(df)) {
   df$score_ciaf1 <- NULL
@@ -2902,7 +2893,7 @@ capture drop ciaf_decile
 recode dist_ciaf_decile (0.2 .3 = 1 "< 30%")(0.4 = 2 "40%") (0.5 = 3 "50%")(0.6 = 4 "60%")(0.7 = 5 "70%")(0.8 = 6 "80%"),
 
 ```{r}
-# shdistri was renamed to shdist
+# shdistri was renamed to shdist in the latest DHS
 
 # Calculate mean CIAF by shdist and sort
 df <- df %>% group_by(shdist) %>% arrange(shdist) %>% 
@@ -2944,7 +2935,16 @@ df$mean_district_CIAF_60_69.9 <- ifelse(df$ciaf_decile == "60%", 1, 0)  %>% as.f
 df$mean_district_CIAF_70_79.9 <- ifelse(df$ciaf_decile == "70%", 1, 0) %>% as.factor()
 df$mean_district_CIAF_80_89.9 <- ifelse(df$ciaf_decile == "80%", 1, 0) %>% as.factor()
 
+recoded_vars <- append(recoded_vars, "mean_district_CIAF_40_49.9")
+recoded_vars <- append(recoded_vars, "mean_district_CIAF_50_59.9")
+recoded_vars <- append(recoded_vars, "mean_district_CIAF_60_69.9")
+recoded_vars <- append(recoded_vars, "mean_district_CIAF_70_79.9")
 recoded_vars <- append(recoded_vars, "mean_district_CIAF_80_89.9")
+```
+
+```{r}
+# Convert CIAF to factor after using is as numeric before
+df$ciaf <- as.factor(df$ciaf)
 ```
 
 
@@ -3032,11 +3032,13 @@ rev(colnames(df))
 ```
 
 ```{r}
-#path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-path <- "data/DHS-2019-21/"
-dffile <- "recoded.rda"
-save(df, file = here(path, dffile))
+# Save recoded data as R object
+dffile <- here(data_folder, "recoded.rda") 
+save(df, file=dffile)
+```
 
-rvfile <- "recoded-variables.txt"
-write.table(recoded_vars, here(path, rvfile), row.names = FALSE, col.names = FALSE)
+```{r}
+# Save list of recoded variables
+rvfile <- here(data_folder, "recoded-variables.txt")
+write.table(recoded_vars, rvfile, row.names=FALSE, col.names=FALSE)
 ```
