@@ -60,6 +60,20 @@ convert_numeric_to_integer <- function(df, num_cols) {
   }
   return(df)
 }
+
+get_const_vars <- function(df) {
+  const_vars <- c()
+  for (var in colnames(df)) {
+    unique_values <- unique(df[[var]])
+    contains_NA <- any(is.na(unique_values))
+    if ((length(unique_values) == 1) || ((length(unique_values) == 2) && contains_NA))  {
+      print(var)
+      print(unique_values)
+      const_vars <- c(const_vars, var)
+    }
+  }
+  return(const_vars)
+}
 ```
 
 ```{r}
@@ -263,29 +277,19 @@ onehot_encoding
 ```
 
 ```{r}
-dfr <- dfr %>% select(-all_of(factor_variables))
-dfr
+dfr_nf <- dfr %>% select(-all_of(factor_variables))
+dfr_nf
 ```
 
 ```{r}
-dfc <- cbind(dfr, onehot_encoding)
+dfc <- cbind(dfr_nf, onehot_encoding)
 var_class <- get_class_of_columns(dfc)
 unique(var_class$variable_class)
 names(dfc) <- make.names(names(dfc))
 ```
 
 ```{r}
-const_vars <- c()
-for (var in colnames(dfc)) {
-  unique_values <- unique(dfc[[var]])
-  contains_NA <- any(is.na(unique_values))
-  
-  if ((length(unique_values) == 1) || ((length(unique_values) == 2) && contains_NA))  {
-      print(var)
-      print(unique_values)
-      const_vars <- c(const_vars, var)
-  }
-}
+const_vars <- get_const_vars(dfc)
 print("Removing constant variables")
 print(const_vars)
 dfc <- dfc %>% select(-all_of(const_vars))
@@ -321,8 +325,7 @@ nafile <- here(data_folder, "percentageNA.csv")
 write.csv(x=missing_na_df_precentage,
           file=nafile,
           quote=FALSE,
-          row.names=FALSE,
-          col.names=TRUE)
+          row.names=FALSE)
 ```
 
 ```{r}
