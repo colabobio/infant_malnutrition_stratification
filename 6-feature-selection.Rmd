@@ -1,14 +1,13 @@
 ---
 title: "5 - Feature Selection With Factor Variables"
 author: "Justin Guerra"
-date: "2024-05-06"
+date: "2024-07-31"
 output:
   pdf_document: default
   html_document: default
 ---
 
 ```{r setup, include=FALSE}
-#library(mice)
 library(missForest)
 library(missMDA)
 library(magrittr)
@@ -21,24 +20,29 @@ library(caret)
 library(pROC)
 ```
 
-
-# Loading in the cleaned data without one hot encoding
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-dffile <- "imputed_data_with_onehotEncoding.rda"
-load(file = here(path, dffile))
+prop <- read.properties("data.properties")
+data_folder <- prop$data_folder
+output_folder <- prop$output_folder
 
-imputed_dfr
+mdl_folder1 <- here(output_folder,"new-model-derivation")
+dir.create(mdl_folder1)
 ```
 
+```{r}
+dffile <- here(data_folder, "imputed.rda")
+load(file=dffile)
+df <- dfi
+df
+```
 
 ```{r}
 # Convert 'ciaf' to a factor (assuming binary classification)
-imputed_dfr$ciaf <- as.factor(imputed_dfr$ciaf)
+df$ciaf <- as.factor(df$ciaf)
 
 # Separate the response variable and predictors
-response <- imputed_dfr$ciaf
-predictors <- imputed_dfr %>% select(-ciaf)
+response <- df$ciaf
+predictors <- df %>% select(-ciaf)
 
 # Ensure all predictors are numeric
 predictors <- predictors %>% mutate(across(everything(), as.numeric))
@@ -48,60 +52,116 @@ predictors <- predictors %>% mutate(across(everything(), ~ ifelse(is.na(.), mean
 
 # Remove constant columns (those with zero variance)
 predictors <- predictors %>% select_if(~ var(.) != 0)
+writeLines(colnames(predictors), here(mdl_folder1, "all_predictor_names.txt"))
+predictors
+```
+
+```{r}
+# Calculate high-correlated pairs of predictors
+cor_threshold <- 0.5
+cmat <- cor(predictors) 
+cor_df <- as.data.frame(as.table(cmat))
+high_cor_pairs <- cor_df %>%
+  filter(abs(Freq) > cor_threshold & Var1 != Var2) %>%
+  arrange(desc(abs(Freq)))
+
+print(high_cor_pairs)
+write.csv(high_cor_pairs, here(mdl_folder1, "all_predictor_cor.csv"), row.names=FALSE)
+```
+
+```{r}
+# Based on the information in the all_preditor_names.txt and all_predictor_cor.csv
+# files generated in the previous steps, one should be able to determine
+# redundant variables and put them in the file redundant_predictors.txt, which is
+# loaded below:
+redvar_file <- here(mdl_folder1, "redundant_predictors.txt")
+redundant_vars <- readLines(redvar_file)
+redundant_vars
+```
+
+```{r}
+# Removing redundant predictors
+predictors <- predictors %>% select(-all_of(redundant_vars))
+predictors
+```
+
+
+```{r}
+```
+
+
+```{r}
+# Split the data into selection, training, and testing sets (34% selection, 33% training, 33% testing)
+
+set.seed(2387) # For reproducibility
 
 # Convert predictors to a matrix
 predictors_matrix <- as.matrix(predictors)
 
-# Split the data into training, validation, and testing sets (60% training, 20% validation, 20% testing)
-set.seed(123) # For reproducibility
-train_index <- createDataPartition(response, p = 0.6, list = FALSE)
-valid_test_index <- createDataPartition(response[-train_index], p = 0.5, list = FALSE)
+sel_index <- createDataPartition(response, p = 0.34, list = FALSE)
+train_test_index <- createDataPartition(response[-sel_index], p = 0.5, list = FALSE)
 
-train_predictors <- predictors_matrix[train_index, ]
-valid_predictors <- predictors_matrix[-train_index, ][valid_test_index, ]
-test_predictors <- predictors_matrix[-train_index, ][-valid_test_index, ]
+sel_predictors <- predictors_matrix[sel_index, ]
+train_predictors <- predictors_matrix[-sel_index, ][train_test_index, ]
+test_predictors <- predictors_matrix[-sel_index, ][-train_test_index, ]
 
-train_response <- response[train_index]
-valid_response <- response[-train_index][valid_test_index]
-test_response <- response[-train_index][-valid_test_index]
+sel_response <- response[sel_index]
+train_response <- response[-sel_index][train_test_index]
+test_response <- response[-sel_index][-train_test_index]
+```
 
+```{r}
 # Standardize the training predictors
-train_predictors <- scale(train_predictors)
-
-# Apply the same scaling to the validation and test predictors using the parameters from the training set
-valid_predictors <- scale(valid_predictors, center = attr(train_predictors, "scaled:center"), scale = attr(train_predictors, "scaled:scale"))
-test_predictors <- scale(test_predictors, center = attr(train_predictors, "scaled:center"), scale = attr(train_predictors, "scaled:scale"))
+sel_predictors <- scale(sel_predictors)
 
 # Perform logistic regression with L1 regularization for feature selection on the training set with validation
-lasso_model <- cv.glmnet(train_predictors, train_response, alpha = 1, family = "binomial", nfolds = 5)
+lasso_model <- cv.glmnet(sel_predictors, sel_response, alpha = 1, family = "binomial", nfolds = 5)
 
 # Get the coefficients of the model with the best lambda (regularization parameter) based on validation performance
 best_lambda <- lasso_model$lambda.min
 coefficients <- coef(lasso_model, s = best_lambda)
+```
+
+```{r}
+sel_threshold <- 1e-3
 
 # Extract the names of the selected features
-selected_features <- rownames(coefficients)[which(coefficients != 0)]
+selected_features <- rownames(coefficients)[which(abs(coefficients) > sel_threshold)]
 selected_features <- selected_features[selected_features != "(Intercept)"]
 
 # Print selected features
 print(selected_features)
 
+writeLines(selected_features, here(mdl_folder1, "sel_predictor_names.txt"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Apply the same scaling to the training and test predictors using the parameters from the selection set
+#train_predictors <- scale(train_predictors, center = attr(sel_predictors, "scaled:center"), scale = attr(sel_predictors, "scaled:scale"))
+#test_predictors <- scale(test_predictors, center = attr(train_predictors, "scaled:center"), scale = attr(train_predictors, "scaled:scale"))
+
+# need best_lambda
+
 # Use the selected features to create new training and testing sets
 selected_train_predictors <- train_predictors[, selected_features]
-selected_valid_predictors <- valid_predictors[, selected_features]
 selected_test_predictors <- test_predictors[, selected_features]
 
 # Fit logistic regression model using only the selected features on the training set
 final_lasso_model <- glmnet(selected_train_predictors, train_response, alpha = 1, lambda = best_lambda, family = "binomial")
+```
 
-# Make predictions on the validation set
-valid_predictions <- predict(final_lasso_model, newx = selected_valid_predictors, type = "response")
-
-
-# Calculate AUC-ROC on the validation set
-valid_auc <- roc(valid_response, valid_predictions)$auc
-print(paste("AUC-ROC on validation set:", valid_auc))
-
+```{r}
 # Make predictions on the test set
 test_predictions <- predict(final_lasso_model, newx = selected_test_predictors, type = "response")
 
@@ -110,38 +170,32 @@ test_auc <- roc(test_response, test_predictions)$auc
 print(paste("AUC-ROC on test set:", test_auc))
 
 # Convert predictions to binary classes (0 or 1) using a threshold of 0.5
-valid_pred_class <- ifelse(valid_predictions > 0.5, 1, 0)
 test_pred_class <- ifelse(test_predictions > 0.5, 1, 0)
 
-# Create confusion matrices for validation and test sets
-valid_conf_matrix <- confusionMatrix(factor(valid_pred_class), valid_response, positive = "1")
-test_conf_matrix <- confusionMatrix(factor(test_pred_class), test_response, "1")
+# Create confusion matrices for test sets
+test_conf_matrix <- confusionMatrix(factor(test_pred_class), test_response, positive = "1")
 
 # Print confusion matrices
-print(valid_conf_matrix)
 print(test_conf_matrix)
-
-roc_Validation <- roc(valid_response, valid_predictions)
 
 roc_test <- roc(test_response, test_predictions)
 
 #Plot ROC curve for test data
-plot(roc_Validation, main = paste0("Lasso ROC Curve for Test Data: AUC = ", round(test_auc ,
-                                                                      digits = 3)))
-
-
-# Plot ROC curve for validation data
-plot(roc_Validation, main = paste0("Lasso ROC Curve for Validation Data: AUC = ", round(valid_auc,
-                                                                      digits = 3)))
-
-
+plot(roc_test, main = paste0("Lasso ROC Curve for Test Data: AUC = ", round(test_auc, digits = 3)))
 ```
+
+
+
+
+
+
+
 
 ```{r}
 # Create initial split: 60% training and 40% remaining
-trainIndex <- createDataPartition(imputed_dfr$ciaf, p = 0.6, list = FALSE)
-trainData <- imputed_dfr[trainIndex,] %>% select(c(selected_features, "ciaf"))
-remainingData <- imputed_dfr[-trainIndex,] %>% select(c(selected_features, "ciaf"))
+trainIndex <- createDataPartition(df$ciaf, p = 0.6, list = FALSE)
+trainData <- df[trainIndex,] %>% select(c(selected_features, "ciaf"))
+remainingData <- df[-trainIndex,] %>% select(c(selected_features, "ciaf"))
 
 # Split remaining data into 50% validation and 50% testing
 validationIndex <- createDataPartition(remainingData$ciaf, p = 0.5, list = FALSE)
@@ -192,15 +246,15 @@ plot(roc_validation, main = paste0("Naive Bayes ROC Curve for Validation Data: A
 
 ```{r}
 # Ensure the target variable is a factor
-imputed_dfr$ciaf <- as.factor(imputed_dfr$ciaf)
+df$ciaf <- as.factor(df$ciaf)
 
 # Split the data into training and testing sets
 set.seed(123) # For reproducibility
-trainIndex <- createDataPartition(imputed_dfr$ciaf, p = .8, 
+trainIndex <- createDataPartition(df$ciaf, p = .8, 
                                   list = FALSE, 
                                   times = 1)
-train_data <- imputed_dfr[trainIndex, ]
-test_data <- imputed_dfr[-trainIndex, ]
+train_data <- df[trainIndex, ]
+test_data <- df[-trainIndex, ]
 
 # Prepare the data for XGBoost
 train_matrix <- xgb.DMatrix(data = as.matrix(train_data[, -which(names(train_data) == "ciaf")]), 

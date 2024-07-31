@@ -23,7 +23,7 @@ prop <- read.properties("data.properties")
 data_folder <- prop$data_folder
 
 # Variables with more than this percentage of missing values are removed
-precentage_missing_cutoff <- 35
+percentage_missing_cutoff <- 35
 ```
 
 ```{r}
@@ -218,7 +218,8 @@ other_ciaf_vars <- c("dist_ciaf_mean",
                      "mean_wasted_dist", 
                      "o_wasted", 
                      "o_underweight", 
-                     "o_stunted")
+                     "o_stunted",
+                     "stunt_waste")
 
 # Remove the columns from dfr
 dfr <- dfr %>% select(-all_of(unk_vars))
@@ -331,21 +332,21 @@ missing_na_df_percentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` =
 
 ```{r}
 nafile <- here(data_folder, "percentageNA.csv")
-write.csv(x=missing_na_df_precentage,
+write.csv(x=missing_na_df_percentage,
           file=nafile,
           quote=FALSE,
           row.names=FALSE)
 ```
 
 ```{r}
-HighPrecentageofNAs <- missing_na_df_precentage %>% 
-  dplyr::filter(`Percentage of NAs` > precentage_missing_cutoff) %>% 
+HighPercentageofNAs <- missing_na_df_percentage %>% 
+  dplyr::filter(`Percentage of NAs` > percentage_missing_cutoff) %>% 
   dplyr::select(Variable) %>% dplyr::pull()
-HighPrecentageofNAs
+HighPercentageofNAs
 ```
 
 ```{r}
-dfc <- dfc %>% select(-all_of(HighPrecentageofNAs))
+dfc <- dfc %>% select(-all_of(HighPercentageofNAs))
 dfc
 ```
 
