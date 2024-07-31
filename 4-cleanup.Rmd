@@ -21,6 +21,9 @@ library(properties)
 ```{r}
 prop <- read.properties("data.properties")
 data_folder <- prop$data_folder
+
+# Variables with more than this percentage of missing values are removed
+precentage_missing_cutoff <- 35
 ```
 
 ```{r}
@@ -206,10 +209,16 @@ ciaf_scale_vars <- c("scale_ciaf1_house",
                      "scale_ciaf1_priority",
                      "score_ciaf1")
 
-#other_ciaf_vars <- c("dist_ciaf_mean",
-#                     "mean_ciaf_dist",
-#                     "dist_ciaf_decile",
-#                     "ciaf_decile")
+other_ciaf_vars <- c("dist_ciaf_mean",
+                     "mean_ciaf_dist",
+                     "dist_ciaf_decile",
+                     "ciaf_decile", 
+                     "dist_wasted_decile", 
+                     "wasted_decile", 
+                     "mean_wasted_dist", 
+                     "o_wasted", 
+                     "o_underweight", 
+                     "o_stunted")
 
 # Remove the columns from dfr
 dfr <- dfr %>% select(-all_of(unk_vars))
@@ -217,7 +226,7 @@ dfr <- dfr %>% select(-all_of(measure_vars))
 dfr <- dfr %>% select(-all_of(redundant_vars))
 dfr <- dfr %>% select(-all_of(geo_vars))
 dfr <- dfr %>% select(-all_of(ciaf_scale_vars))
-#dfr <- dfr %>% select(-all_of(other_ciaf_vars))
+dfr <- dfr %>% select(-all_of(other_ciaf_vars))
 ```
 
 ```{r}
@@ -315,9 +324,9 @@ na_count
 
 missing_na_df = sapply(dfc, function(x) sum(is.na(x))) %>% as.data.frame() %>% rownames_to_column(var = "variable") 
 colnames(missing_na_df) = c("Variable", "Number of NAs")  
-missing_na_df_precentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` = as.integer(`Number of NAs` / as.numeric(nrow(dfc)) * 100)) %>% 
+missing_na_df_percentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` = as.integer(`Number of NAs` / as.numeric(nrow(dfc)) * 100)) %>% 
   arrange(desc(`Number of NAs`))
-  missing_na_df_precentage
+  missing_na_df_percentage
 ```
 
 ```{r}
@@ -329,11 +338,10 @@ write.csv(x=missing_na_df_precentage,
 ```
 
 ```{r}
-precentage_cutoff <- 35
-
 HighPrecentageofNAs <- missing_na_df_precentage %>% 
-  dplyr::filter(`Percentage of NAs` > precentage_cutoff) %>% 
+  dplyr::filter(`Percentage of NAs` > precentage_missing_cutoff) %>% 
   dplyr::select(Variable) %>% dplyr::pull()
+HighPrecentageofNAs
 ```
 
 ```{r}

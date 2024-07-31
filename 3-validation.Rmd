@@ -31,6 +31,7 @@ source('./mdl-evaluation.R')
 ```{r}
 prop <- read.properties("data.properties")
 data_folder <- prop$data_folder
+output_folder <- prop$output_folder
 ```
 
 ```{r}
@@ -126,7 +127,7 @@ prob0 <- calc_pred_probs(pred0)
 ```
 
 ```{r}
-mdl_folder0 <- here(data_folder,"orig-model-validation")
+mdl_folder0 <- here(output_folder,"orig-model-validation")
 dir.create(mdl_folder0)
 
 # Generate the data frame with the data needed for the calibration and ROC plots
