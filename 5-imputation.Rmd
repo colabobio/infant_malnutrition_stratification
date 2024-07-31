@@ -1,8 +1,8 @@
 ---
 title: "Data Imputation from Emperical Distribution With Factor Variables"
-author: "Justin Guerra"
-date: "2024-04-15"
+author: "Justin Guerra, Andres Colubri"
 output: html_document
+date: "2024-07-31"
 ---
 
 ```{r setup, include=FALSE}
@@ -102,4 +102,3 @@ for (var in vars_with_na) {
 dffile <- here(data_folder, "imputed.rda")
 save(dfi, file=dffile)
 ```
-

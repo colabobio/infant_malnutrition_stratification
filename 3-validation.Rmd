@@ -1,7 +1,8 @@
 ---
-title: "Perm original model validation"
+title: "Validation of original risk model"
+author: "Justin Guerra, Arnav Gupta, Andres Colubri"
 output: html_document
-date: "2023-03-21"
+date: "2024-07-31"
 ---
 
 From Stata to R
