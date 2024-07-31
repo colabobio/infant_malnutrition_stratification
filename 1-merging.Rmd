@@ -62,8 +62,8 @@ df
 
 ```{r}
 # Save merged data as csv
-csvfile <- here(data_folder, "merged.csv") 
-write.csv(df, csvfile, row.names=FALSE)
+# csvfile <- here(data_folder, "merged.csv") 
+# write.csv(df, csvfile, row.names=FALSE)
 ```
 
 ```{r}

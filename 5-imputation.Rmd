@@ -99,7 +99,7 @@ for (var in vars_with_na) {
 
 ```{r}
 # Save the new data
-dffile <- here(data_folder, "imputed")
+dffile <- here(data_folder, "imputed.rda")
 save(dfi, file=dffile)
 ```
 
