@@ -1,0 +1,95 @@
+---
+title: "5 - Feature Selection With Factor Variables"
+author: "Justin Guerra"
+date: "2024-07-31"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(magrittr)
+library(here) 
+library(glmnet)
+library(dplyr)
+library(caret)
+library(pROC)
+library(properties)
+library(ResourceSelection)
+library(CalibrationCurves)
+```
+
+```{r message=FALSE, cache=F}
+source('./mdl-evaluation.R')
+```
+
+```{r}
+prop <- read.properties("data.properties")
+data_folder <- prop$data_folder
+output_folder <- prop$output_folder
+mdl_folder1 <- here(output_folder,"new-model-derivation")
+```
+
+```{r}
+load(file=here(mdl_folder1, "train_model.rda"))
+load(here(mdl_folder1, "test_predictors.rda"))
+load(here(mdl_folder1, "test_response.rda"))
+selected_features <- readLines(here(mdl_folder1, "sel_predictor_names.txt"))
+```
+
+```{r}
+calc_log_odds <- function(probs) {
+  # Apply the inverse of the logistic link function to get the log odds
+  log_odds <- log(probs / (1 - probs))
+  return(log_odds)
+}
+
+selected_test_predictors <- test_predictors[, selected_features]
+test_predictions <- predict(train_model, newx = selected_test_predictors, type = "response")
+test_probs <- test_predictions[,1]
+test_log_odds <- calc_log_odds(test_probs)
+test_data <- data.frame(out = test_response, logodds = test_log_odds, prob = test_probs)
+```
+
+
+```{r}
+cal_plot(model = NULL, test_data, "prob", model_label = '', dir = mdl_folder1, fn = "cal_plot.pdf")
+cal_c0 <- cal_coeff(test_data, "prob", mdl_folder1, "cal_plot_coefficients.txt")
+print(cal_c0)
+
+roc_plot(test_response, test_probs, dir = mdl_folder1, fn = "roc_plot.pdf")
+```
+
+
+```{r}
+plot_roc_perf(test_data$out, test_data$prob)
+```
+
+```{r}
+conf_matrix(test_data$out, test_data$prob, 0.5, mdl_folder1, "conf_matrix.txt")
+```
+
+```{r}
+# Hosmer-Lemeshow goodness of fit table for distribution of observed CIAF prevalence vs predicted prevalence
+hosmerlem <- hoslem_test <- hoslem.test(test_response, test_probs, g=10)
+hl_table <- data.frame(
+  Observed = hoslem_test$observed,
+  Expected = hoslem_test$expected,
+  Observed_Positive = hoslem_test$observed[,2],
+  Expected_Positive = hoslem_test$expected[,2]
+)
+hosmerlem
+print(hl_table)
+```
+```{r}
+hl_file <- here(mdl_folder1, "hl_table.csv")
+write.csv(hl_table, hl_file, row.names=FALSE)
+```
+
+
+```{r}
+# Generating calibration curve using the CalibrationCurves package
+# https://cran.r-project.org/web/packages/CalibrationCurves/vignettes/CalibrationCurves.html
+
+calPerf = val.prob.ci.2(test_probs, test_response)
+```

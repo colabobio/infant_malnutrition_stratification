@@ -1,7 +1,8 @@
 ---
-title: "Perm original model validation"
+title: "Validation of original risk model"
+author: "Justin Guerra, Arnav Gupta, Andres Colubri"
 output: html_document
-date: "2023-03-21"
+date: "2024-07-31"
 ---
 
 From Stata to R
@@ -20,6 +21,9 @@ library(mice)
 library(ROCit)
 library(pROC)
 library(ggplot2)
+library(properties)
+library(ResourceSelection)
+library(CalibrationCurves)
 ```
 
 ```{r message=FALSE, cache=F}
@@ -27,13 +31,15 @@ source('./mdl-evaluation.R')
 ```
 
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/recoded.rda"
-#path <- "data/DHS-2019-21/"
-
-load(file = path)
+prop <- read.properties("data.properties")
+data_folder <- prop$data_folder
+output_folder <- prop$output_folder
 ```
 
-
+```{r}
+dffile <- here(data_folder, "recoded.rda")
+load(file=dffile)
+```
 
 ```{r}
 model_vars <- c("maternal_height_4feet8inches_to_less_5feetinches",
@@ -90,9 +96,8 @@ df_model <- df[, model_vars]
 
 df_model_nona <- na.omit(df_model) %>%
   dplyr::mutate_if(is.factor, as.character) %>% #Change from factor to character (some reason converting 0s and 1s to 1s and 2s)
-   dplyr::mutate_if(is.character, as.integer) #Change from character to integer
+  dplyr::mutate_if(is.character, as.integer) #Change from character to integer
 ```
-
 
 ```{r}
 # Function to calculate the predicted the log odds (linear term of the model)
@@ -117,21 +122,15 @@ calc_pred_probs <- function(log_odds) {
 }
 ```
 
-
 ```{r}
 data0 <- df_model_nona
 pred0 <- calc_log_odds(model_coeffs, data0)
 prob0 <- calc_pred_probs(pred0)
 ```
 
-
-
 ```{r}
-#mdl_folder0 = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/"
-mdl_folder0 = "/Users/justi/OneDrive/Desktop/colabo_infant_malnutrition/"
-#mdl_folder0 <- "data/DHS-2019-21/orig-model-validation"
+mdl_folder0 <- here(output_folder,"orig-model-validation")
 dir.create(mdl_folder0)
-
 
 # Generate the data frame with the data needed for the calibration and ROC plots
 plot_data0 <- data.frame(out = data0$ciaf, logodds = pred0, prob = prob0)
@@ -142,10 +141,35 @@ print(cal_c0)
 
 roc_plot(data0$ciaf, prob0, dir = mdl_folder0, fn = "roc_plot.pdf")
 ```
+
 ```{r}
 plot_roc_perf(plot_data0$out, plot_data0$prob)
 ```
 
 ```{r}
 conf_matrix(plot_data0$out, plot_data0$prob, 0.5, mdl_folder0, "conf_matrix.txt")
+```
+
+```{r}
+# Hosmer-Lemeshow goodness of fit table for distribution of observed CIAF prevalence vs predicted prevalence
+hosmerlem <- hoslem_test <- hoslem.test(data0$ciaf, prob0, g=10)
+hl_table <- data.frame(
+  Observed = hoslem_test$observed,
+  Expected = hoslem_test$expected,
+  Observed_Positive = hoslem_test$observed[,2],
+  Expected_Positive = hoslem_test$expected[,2]
+)
+hosmerlem
+print(hl_table)
+```
+```{r}
+hl_file <- here(mdl_folder0, "hl_table.csv")
+write.csv(hl_table, hl_file, row.names=FALSE)
+```
+
+```{r}
+# Generating calibration curve using the CalibrationCurves package
+# https://cran.r-project.org/web/packages/CalibrationCurves/vignettes/CalibrationCurves.html
+
+calPerf = val.prob.ci.2(prob0, data0$ciaf)
 ```

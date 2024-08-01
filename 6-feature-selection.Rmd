@@ -1,0 +1,159 @@
+---
+title: "5 - Feature Selection With Factor Variables"
+author: "Justin Guerra"
+date: "2024-07-31"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(magrittr)
+library(here) 
+library(glmnet)
+library(dplyr)
+library(caret)
+library(pROC)
+library(properties)
+```
+
+```{r}
+prop <- read.properties("data.properties")
+data_folder <- prop$data_folder
+output_folder <- prop$output_folder
+
+mdl_folder1 <- here(output_folder,"new-model-derivation")
+dir.create(mdl_folder1)
+```
+
+```{r}
+dffile <- here(data_folder, "imputed.rda")
+load(file=dffile)
+df <- dfi
+df
+```
+
+```{r}
+# Convert 'ciaf' to a factor (assuming binary classification)
+#df$ciaf <- as.factor(df$ciaf)
+
+# Separate the response variable and predictors
+response <- df$ciaf
+predictors <- df %>% select(-ciaf)
+
+# Ensure all predictors are numeric
+predictors <- predictors %>% mutate(across(everything(), as.numeric))
+
+# Impute any missing values with the mean of the column
+predictors <- predictors %>% mutate(across(everything(), ~ ifelse(is.na(.), mean(., na.rm = TRUE), .)))
+
+# Remove constant columns (those with zero variance)
+predictors <- predictors %>% select_if(~ var(.) != 0)
+writeLines(colnames(predictors), here(mdl_folder1, "all_predictor_names.txt"))
+predictors
+```
+
+```{r}
+# Calculate high-correlated pairs of predictors
+cor_threshold <- 0.5
+cmat <- cor(predictors) 
+cor_df <- as.data.frame(as.table(cmat))
+high_cor_pairs <- cor_df %>%
+  filter(abs(Freq) > cor_threshold & Var1 != Var2) %>%
+  arrange(desc(abs(Freq)))
+
+print(high_cor_pairs)
+write.csv(high_cor_pairs, here(mdl_folder1, "all_predictor_cor.csv"), row.names=FALSE)
+```
+
+```{r}
+# Based on the information in the all_preditor_names.txt and all_predictor_cor.csv
+# files generated in the previous steps, one should be able to determine
+# redundant variables and put them in the file redundant_predictors.txt, which is
+# loaded below:
+redvar_file <- here(mdl_folder1, "redundant_predictors.txt")
+redundant_vars <- readLines(redvar_file)
+redundant_vars
+```
+
+```{r}
+# Removing redundant predictors
+predictors <- predictors %>% select(-all_of(redundant_vars))
+predictors
+```
+
+```{r}
+# Split the data into selection, training, and testing sets (34% selection, 33% training, 33% testing)
+
+set.seed(2387) # For reproducibility
+
+# Convert predictors to a matrix
+predictors_matrix <- as.matrix(predictors)
+
+sel_index <- createDataPartition(response, p = 0.34, list = FALSE)
+train_test_index <- createDataPartition(response[-sel_index], p = 0.5, list = FALSE)
+
+sel_predictors <- predictors_matrix[sel_index, ]
+train_predictors <- predictors_matrix[-sel_index, ][train_test_index, ]
+test_predictors <- predictors_matrix[-sel_index, ][-train_test_index, ]
+
+sel_response <- response[sel_index]
+train_response <- response[-sel_index][train_test_index]
+test_response <- response[-sel_index][-train_test_index]
+```
+
+```{r}
+# Standardize the training predictors
+sel_predictors <- scale(sel_predictors)
+
+# Perform logistic regression with L1 regularization for feature selection on the training set with validation
+lasso_model <- cv.glmnet(sel_predictors, sel_response, alpha = 1, family = "binomial", nfolds = 5)
+
+# Get the coefficients of the model with the best lambda (regularization parameter) based on validation performance
+best_lambda <- lasso_model$lambda.min
+coefficients <- coef(lasso_model, s = best_lambda)
+```
+
+```{r}
+sel_threshold <- 1e-3
+
+# Extract the names of the selected features
+selected_features <- rownames(coefficients)[which(abs(coefficients) > sel_threshold)]
+selected_features <- selected_features[selected_features != "(Intercept)"]
+
+# Print selected features
+print(selected_features)
+
+writeLines(selected_features, here(mdl_folder1, "sel_predictor_names.txt"))
+```
+
+```{r}
+# Use the selected features to create training sets
+selected_train_predictors <- train_predictors[, selected_features]
+
+# Fit logistic regression model using only the selected features on the training set
+train_model <- glmnet(selected_train_predictors, train_response, alpha = 1, lambda = best_lambda, family = "binomial")
+```
+
+```{r}
+coef_matrix <- coef(train_model)
+print(coef_matrix)
+      
+# Convert the dgCMatrix to a dataframe
+coef_df <- as.data.frame(as.matrix(coef_matrix))
+
+# Add row names as a column
+coef_df <- cbind(Variable = rownames(coef_df), coef_df)
+
+# Rename the coefficient column for clarity
+colnames(coef_df)[2] <- "Coefficient"
+
+write.csv(coef_df, here(mdl_folder1, "new_model_coeff.csv"), row.names=FALSE)
+```
+
+```{r}
+# Save model object and test data for testing in the next step
+save(train_model, file=here(mdl_folder1, "train_model.rda"))
+save(test_predictors, file=here(mdl_folder1, "test_predictors.rda"))
+save(test_response, file=here(mdl_folder1, "test_response.rda"))
+```

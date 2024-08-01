@@ -1,0 +1,104 @@
+---
+title: "Data Imputation from Emperical Distribution With Factor Variables"
+author: "Justin Guerra, Andres Colubri"
+output: html_document
+date: "2024-07-31"
+---
+
+```{r setup, include=FALSE}
+
+rm(list = ls())
+library(ggplot2)
+library(missForest)
+library(missMDA)
+library(magrittr)
+library(here) 
+library(dplyr)
+library(purrr)
+library(fastDummies)
+library(properties)
+```
+
+```{r}
+prop <- read.properties("data.properties")
+data_folder <- prop$data_folder
+output_folder <- prop$output_folder
+```
+
+```{r}
+dffile <- here(data_folder, "cleaned.rda")
+load(file=dffile)
+dfc
+```
+
+```{r}
+missing_na_df = sapply(dfc, function(x) sum(is.na(x))) %>% as.data.frame() %>% rownames_to_column(var = "variable") 
+colnames(missing_na_df) = c("Variable", "Number of NAs")  
+missing_na_df_percentage = missing_na_df %>% dplyr::mutate(`Percentage of NAs` = as.integer(`Number of NAs` / as.numeric(nrow(dfc)) * 100)) %>% 
+  arrange(desc(`Number of NAs`))
+
+vars_with_na <- subset(missing_na_df_percentage, `Percentage of NAs` > 0)$Variable
+
+missing_na_df_percentage
+```
+
+```{r}
+# Function to impute missing values by sampling from the empirical distribution of each column
+impute_missing_values <- function(df) {
+  # Apply a function across all columns using dplyr's mutate_all
+  df %>% mutate_all(function(column) {
+    if(any(is.na(column))) {  # Check if there are any NA values in the column
+      # Non-missing values
+      non_missing <- na.omit(column)
+      # Sample from non-missing values to replace NA values
+      # Sample size equals the number of missing values
+      column[is.na(column)] <- sample(non_missing, sum(is.na(column)), replace = TRUE)
+    }
+    return(column)
+  })
+}
+```
+
+```{r}
+# Impute dfc using empirical distribution to impute missing values 
+dfi = dfc %>% impute_missing_values()
+dfi
+```
+
+```{r}
+dfi %>% is.na() %>% colSums() # check over the number of missing values
+```
+
+```{r}
+# Histogram distribution of the imputed missing values
+for (var in vars_with_na) {
+  print(var)
+  ggplot(dfi, aes(x = .data[[var]])) +
+    geom_histogram(bins = 20, fill = "lightblue", color = "black") +
+    labs(x = var, y = "Count")
+}
+```
+
+```{r}
+imp_folder0 <- here(output_folder,"imputation-plots")
+dir.create(imp_folder0)
+
+for (var in vars_with_na) {
+  print(var)
+  pc <- ggplot(dfc, aes(x = .data[[var]])) +
+          geom_histogram(bins = 20, fill = "lightblue", color = "black") +
+          labs(x = var, y = "Count")
+  ggsave(here(imp_folder0, paste0("plot_", var, "_0", ".png")), plot=pc)
+  
+  pi <- ggplot(dfi, aes(x = .data[[var]])) +
+          geom_histogram(bins = 20, fill = "lightblue", color = "black") +
+          labs(x = var, y = "Count")
+  ggsave(here(imp_folder0, paste0("plot_", var, "_imp", ".png")), plot=pi)
+}
+```
+
+```{r}
+# Save the new data
+dffile <- here(data_folder, "imputed.rda")
+save(dfi, file=dffile)
+```

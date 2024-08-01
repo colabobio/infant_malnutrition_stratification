@@ -1,7 +1,8 @@
 ---
-title: "Perm data recoding"
+title: "DHS data recoding"
+author: "Justin Guerra, Arnav Gupta, Andres Colubri"
 output: html_document
-date: "2023-03-21"
+date: "2024-07-31"
 ---
 
 From Stata to R
@@ -18,24 +19,26 @@ library(tidyverse)  # most variable creation here uses tidyverse
 library(tidyselect) # used to select variables in FP_EVENTS.R
 library(haven)      # used for Haven labeled DHSvariables
 library(labelled)   # used for Haven labeled variable creation
-library(expss)    # for creating tables with Haven labeled df
+library(expss)      # for creating tables with Haven labeled df
 library(readxl)     # for exporting to excel
-library(naniar)   # to use replace_with_na function
+library(naniar)     # to use replace_with_na function
 library(here)       # to get R project path
 library(sjlabelled) # to set variables label
-library(survey)  # to calculate weighted ratio for GAR
+library(survey)     # to calculate weighted ratio for GAR
 library(Hmisc)
 library(tidyr)
-
+library(properties)
 ```
 
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-#path <- "data/DHS-2019-21/"
-datafile <- "merged.rda"
-load(paste0(path, datafile))
+prop <- read.properties("data.properties")
+data_folder <- prop$data_folder
 ```
 
+```{r}
+datafile <- here(data_folder, "merged.rda") 
+load(datafile)
+```
 
 **** Some utilities
 
@@ -48,6 +51,13 @@ fct_case_when <- function(...) {
   levels <- levels[!is.na(levels)]
   factor(dplyr::case_when(...), levels=levels)
 }
+```
+
+
+**** List of recoded variables
+
+```{r}
+recoded_vars <- c()
 ```
 
 
@@ -74,6 +84,7 @@ if ("house_id" %in% names(df)) {
 # create `house_id` variable as a concatenation of `hv001` and `hv002`
 df$house_id <- as.numeric(paste0(df$hv001, df$hv002))
 ```
+
 
 capture drop wgt
 generate wgt = hv005/1000000 
@@ -110,6 +121,8 @@ design <- svydesign(
 
 # Update the design with the wgt2 variable
 design <- update(design, wgt2 = df$wgt2)
+
+recoded_vars <- append(recoded_vars, "wgt2")
 ```
 
 
@@ -128,6 +141,8 @@ if("eligch" %in% colnames(df)) {
 # Generate eligch variable
 df$eligch <- 0
 df$eligch[df$hv103 == 1 & df$hc70 < 9996 & df$hc71 < 9996 & df$hc72 < 9996] <- 1
+
+recoded_vars <- append(recoded_vars, "eligch")
 ```
 
 capture drop defacto_child
@@ -178,6 +193,8 @@ if("father_id" %in% colnames(df)) {
 # Generate father_id variable
 df$father_id <- as.numeric(paste0(df$hv001, df$hv002, df$hv114))
 df$father_id[is.na(df$midx)] <- NA
+
+recoded_vars <- append(recoded_vars, "defacto_child")
 ```
 
 **** Anthropometric variables ****
@@ -198,6 +215,8 @@ if("child_age" %in% colnames(df)) {
 
 # Generate child_age variable
 df$child_age <- df$hc1
+
+recoded_vars <- append(recoded_vars, "child_age")
 ```
 
 ```{r}
@@ -222,6 +241,9 @@ df$age_group_5y <- cut(df$child_age,
                                breaks = c(-Inf, 5, 11, 17, 23, 35, 47, 60),
                                labels = c("0. 0-5 mo", "1. 6-11 mo", "2. 12-17 mo", "3. 18-23 mo", "4. 24-35 mo", "5. 36-47 mo", "6. 48-60 mo"),
                                right = TRUE)
+
+recoded_vars <- append(recoded_vars, "age_group")
+recoded_vars <- append(recoded_vars, "age_group_5y")
 ```
 
 
@@ -267,6 +289,11 @@ if("height_position" %in% colnames(df)) {
 # Generate height_position variable
 df$height_position <- df$hc15
 
+recoded_vars <- append(recoded_vars, "anthro_measured")
+recoded_vars <- append(recoded_vars, "height_position")
+```
+
+```{r}
 # Remove haz, waz, whz, bmiz variables if they exist
 df[, c("haz", "waz", "whz", "bmiz")] <- NULL
 
@@ -303,13 +330,19 @@ df$o_stunted <- cut(df$haz,
                            breaks = c(-6, -3.01, -2.01, -0.01, Inf),
                            labels = c("3. lower than -3", "2. < -2 and => -3", "1. < 0 and => -2", "0. 0 or higher"),
                            right = FALSE)
+
+recoded_vars <- append(recoded_vars, "haz") 
+recoded_vars <- append(recoded_vars, "waz") 
+recoded_vars <- append(recoded_vars, "whz")
+recoded_vars <- append(recoded_vars, "bmiz")
+recoded_vars <- append(recoded_vars, "stunted")
+recoded_vars <- append(recoded_vars, "o_stunted")
 ```
 
 capture drop underweight 
 gen underweight = . 
 replace underweight = 1 if waz < -2
 replace underweight = 0 if waz >= -2 & waz != . 
-
 
 ```{r}
 # Remove the "underweight" column if it exists
@@ -328,6 +361,8 @@ df$underweight[df$waz >= -2 & !is.na(df$waz)] <- 0
 
 # Convert to factor
 df$underweight <- as.factor(df$underweight)
+
+recoded_vars <- append(recoded_vars, "underweight")
 ```
 
 capture drop o_underweight
@@ -346,8 +381,9 @@ df$o_underweight <- cut(df$waz,
   labels = c("3. lower than -3", "2. < -2 and => -3", "1. < 0 and => -2", "0. 0 or higher"), 
   include.lowest = TRUE
 )
-```
 
+recoded_vars <- append(recoded_vars, "o_underweight")
+```
 
 capture drop wasted 
 gen wasted = . 
@@ -370,6 +406,8 @@ df$wasted[df$whz >= -2 & !is.na(df$haz)] <- 0
 
 #Convert to factor
 df$wasted <- as.factor(df$wasted)
+
+recoded_vars <- append(recoded_vars, "wasted")
 ```
 
 capture drop o_wasted
@@ -388,6 +426,8 @@ df$o_wasted <- cut(df$whz,
   labels = c("3. lower than -3", "2. < -2 and => -3", "1. < 0 and => -2", "0. 0 or higher"), 
   include.lowest = TRUE
 )
+
+recoded_vars <- append(recoded_vars, "o_wasted")
 ```
 
 capture drop ciaf 
@@ -410,6 +450,7 @@ df$ciaf[df$stunted == 1 | df$wasted == 1 | df$underweight == 1] <- 1
 # Replace missing values with NA
 df$ciaf[is.na(df$stunted) | is.na(df$wasted) | is.na(df$underweight)] <- NA
 
+recoded_vars <- append(recoded_vars, "ciaf")
 ```
 
 capture drop stunt_waste
@@ -434,6 +475,8 @@ df$stunt_waste[is.na(df$stunted) | is.na(df$wasted)] <- NA
 
 # Convert to factor
 df$stunt_waste <- as.factor(df$stunt_waste)
+
+recoded_vars <- append(recoded_vars, "stunt_waste")
 ```
 
 
@@ -455,6 +498,8 @@ df$elig[df$bidx == 1] <- 1
 
 #Convert to factor
 df$elig <- as.factor(df$elig)
+
+recoded_vars <- append(recoded_vars, "elig")
 ```
 
 
@@ -474,6 +519,8 @@ if ("wealth_quintile" %in% colnames(df)) {
 # Create a new variable wealth_quintile as a copy of v190
 df <- df %>%
   mutate(wealth_quintile = v190 %>% as.factor())
+
+recoded_vars <- append(recoded_vars, "wealth_quintile")
 ```
 
 
@@ -501,6 +548,8 @@ df <- df %>%
     maternal_height_cm >= 80  & maternal_height_cm < 145    ~ "5. < 145 cm",
     is.na(maternal_height_cm)                               ~ NA_character_
   ))
+
+recoded_vars <- append(recoded_vars, "maternal_height_cm")
 ```
 
 
@@ -512,6 +561,8 @@ df <- df %>%
 df <- df %>%
   mutate(maternal_height_4feet8inches_to_less_5feetinches = ifelse(df$maternal_height_cm > 142.24  & df$maternal_height_cm < 152.4, 1, 0) %>% as.factor(),
          maternal_height_less_4feet8inches = ifelse(df$maternal_height_cm < 142.24, 1, 0) %>% as.factor())
+
+recoded_vars <- append(recoded_vars, "maternal_height_4feet8inches_to_less_5feetinches")
 ```
 
 
@@ -536,6 +587,8 @@ df <- df %>%
     maternal_bmi_value >= 25   & maternal_bmi_value <= 60   ~ "3. 25+",
     is.na(maternal_bmi_value)                               ~ NA_character_
   ))
+
+recoded_vars <- append(recoded_vars, "maternal_bmi")
 ```
 
 capture drop paternal_height // variable is hb3
@@ -569,6 +622,8 @@ df <- df %>%
   group_by(hhid) %>%
   mutate(paternal_height = first(paternal_height)) %>%
   ungroup()
+
+recoded_vars <- append(recoded_vars, "paternal_height")
 ```
 
 capture drop paternal_bmi // variable is hb40
@@ -602,6 +657,8 @@ df <- df %>%
   group_by(hhid) %>%
   mutate(paternal_bmi = first(paternal_bmi)) %>%
   ungroup()
+
+recoded_vars <- append(recoded_vars, "paternal_bmi")
 ```
 
 capture drop hhadults
@@ -633,6 +690,9 @@ df <- df %>%
     hv009 >= 5 & hv009 <= 8  ~ "2. 5 to 8",
     hv009 >= 9 & hv009 <= 41 ~ "3. 9 or more"
   ))
+
+recoded_vars <- append(recoded_vars, "hhadults")
+recoded_vars <- append(recoded_vars, "hh_members")
 ```
 
 capture drop m_age_marriage
@@ -674,6 +734,9 @@ df <- df %>%
     v212 >= 18 & v212 <= 45 ~ "1. 18+",
     v212 >= 46              ~ NA_character_
   ))
+
+recoded_vars <- append(recoded_vars, "m_age_marriage")
+recoded_vars <- append(recoded_vars, "firstbirth_18y")
 ```
 
 capture drop still_breastfed
@@ -692,6 +755,8 @@ df <- df %>%
   mutate(still_breastfed = if_else(m4 == 95, 1, if_else(m4 != 95 & child_age <= 60, 0, NA_real_)))
 
 df$still_breastfed <- as.factor(df$still_breastfed)
+
+recoded_vars <- append(recoded_vars, "still_breastfed")
 ```
 
 capture drop icfi_breastmilk
@@ -715,13 +780,13 @@ if ("icfi_breastmilk_score" %in% colnames(df)) {
 #     TRUE ~ NA_real_
 #   ))
 
+df$icfi_breastmilk_score <- NA
 df$icfi_breastmilk_score[df$child_age >= 6 & df$child_age <= 60 & is.na(df$still_breastfed)] <- 0
-
 df$icfi_breastmilk_score[df$still_breastfed == 1 & df$child_age >= 6 & df$child_age <= 12] <- 2
-
 df$icfi_breastmilk_score[df$still_breastfed == 1 & df$child_age > 12 & df$child_age <= 60] <- 1
-
 df$icfi_breastmilk_score <- as.factor(df$icfi_breastmilk_score)
+
+recoded_vars <- append(recoded_vars, "icfi_breastmilk_score")
 ```
 
 capture drop icfi_bottlefeed 
@@ -740,10 +805,12 @@ if ("icfi_bottlefeed_score" %in% colnames(df)) {
 #   mutate(icfi_bottlefeed_score = if_else(child_age >= 6 & child_age <= 60 & m38 == 0, 1,
 #                                          if_else(child_age >= 6 & child_age <= 60 & m38 == 1, 0, NA_real_)))
 
+df$icfi_bottlefeed_score <- NA
 df$icfi_bottlefeed_score[df$child_age >= 6 & df$child_age <= 60 & df$m38 == 0] <- 1
 df$icfi_bottlefeed_score[df$child_age >= 6 & df$child_age <= 60 & df$m38 == 1] <- 0
-
 df$icfi_bottlefeed_score <- df$icfi_bottlefeed_score %>% as.factor()
+
+recoded_vars <- append(recoded_vars, "icfi_bottlefeed_score")
 ```
 
 capture drop icfi_starchy_staples_score 
@@ -762,11 +829,12 @@ if ("icfi_starchy_staples_score" %in% colnames(df)) {
 #   mutate(icfi_starchy_staples_score = if_else(child_age >= 6 & child_age <= 24, 0,
 #                                               if_else((v412a == 1 | v412b == 1 | v414e == 1 | v414f == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
-
+df$icfi_starchy_staples_score <- NA
 df$icfi_starchy_staples_score[df$child_age >= 6 & df$child_age <= 24] <- 0
 df$icfi_starchy_staples_score[(df$v412a == 1 | df$v412b == 1 | df$v414e == 1 | df$v414f == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_starchy_staples_score <- df$icfi_starchy_staples_score %>% as.factor()
+
+recoded_vars <- append(recoded_vars, "icfi_starchy_staples_score")
 ```
 
 capture drop icfi_lentils_score
@@ -785,10 +853,12 @@ if ("icfi_lentils_score" %in% colnames(df)) {
 #   mutate(icfi_lentils_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                       if_else(v414o == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_lentils_score <- NA
 df$icfi_lentils_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_lentils_score[df$v414o == 1 & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_lentils_score <- df$icfi_lentils_score %>% as.factor()
+
+recoded_vars <- append(recoded_vars, "icfi_lentils_score")
 ```
 
 
@@ -808,10 +878,12 @@ if ("icfi_milk_score" %in% colnames(df)) {
 #   mutate(icfi_milk_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                    if_else(v411 == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_milk_score <- NA
 df$icfi_milk_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_milk_score[df$v411 == 1 & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_milk_score <- as.factor(df$icfi_milk_score)
+
+recoded_vars <- append(recoded_vars, "icfi_milk_score")
 ```
 
 capture drop icfi_dairy_score
@@ -830,10 +902,12 @@ if ("icfi_dairy_score" %in% colnames(df)) {
 #   mutate(icfi_dairy_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                     if_else((v414p == 1 | v414q == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_dairy_score <- NA
 df$icfi_dairy_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_dairy_score[(df$v414p == 1 | df$v414q == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_dairy_score <- df$icfi_dairy_score %>% as.factor()
+
+recoded_vars <- append(recoded_vars, "icfi_dairy_score")
 ```
 
 
@@ -853,10 +927,12 @@ if ("icfi_meat_score" %in% colnames(df)) {
 #   mutate(icfi_meat_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                    if_else((v414a == 1 | v414m == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_meat_score <- NA
 df$icfi_meat_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_meat_score[(df$v414a == 1 | df$v414m == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_meat_score <- as.factor(df$icfi_meat_score)
+
+recoded_vars <- append(recoded_vars, "icfi_meat_score")
 ```
 
 capture drop icfi_eggs_fish_score
@@ -877,6 +953,7 @@ if ("icfi_eggs_fish_score" %in% colnames(df)) {
 #                                         if_else((v414g == 1 | v414n == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_))) %>%
 #   mutate(icfi_meat_score = if_else(icfi_eggs_fish_score == 1, 1, icfi_meat_score))
 
+df$icfi_eggs_fish_score <- NA
 df$icfi_eggs_fish_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_eggs_fish_score[(df$v414g == 1 | df$v414n == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
 
@@ -887,6 +964,8 @@ df$icfi_meat_score <- ifelse(is.na(df$icfi_meat_score), NA, df$icfi_meat_score)
 df$icfi_meat_score[df$icfi_eggs_fish_score == 1] <- 1
 
 df$icfi_eggs_fish_score <- as.factor(df$icfi_eggs_fish_score)
+
+recoded_vars <- append(recoded_vars, "icfi_eggs_fish_score")
 ```
 
 capture drop icfi_vitA_score
@@ -905,10 +984,12 @@ if ("icfi_vitA_score" %in% colnames(df)) {
 #   mutate(icfi_vitA_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                    if_else((v414i == 1 | v414j == 1 | v414k == 1) & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_vitA_score <- NA
 df$icfi_vitA_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_vitA_score[(df$v414i == 1 | df$v414j == 1 | df$v414k == 1) & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_vitA_score <- as.factor(df$icfi_vitA_score)
+
+recoded_vars <- append(recoded_vars, "icfi_vitA_score")
 ```
 
 capture drop icfi_other_fruits_score
@@ -927,10 +1008,12 @@ if ("icfi_other_fruits_score" %in% colnames(df)) {
 #   mutate(icfi_other_fruits_score = if_else(child_age >= 6 & child_age <= 60, 0,
 #                                            if_else(v414l == 1 & child_age >= 6 & child_age <= 60, 1, NA_real_)))
 
+df$icfi_other_fruits_score <- NA
 df$icfi_other_fruits_score[df$child_age >= 6 & df$child_age <= 60] <- 0
 df$icfi_other_fruits_score[df$v414l == 1 & df$child_age >= 6 & df$child_age <= 60] <- 1
-
 df$icfi_other_fruits_score <- as.factor(df$icfi_other_fruits_score)
+
+recoded_vars <- append(recoded_vars, "icfi_other_fruits_score")
 ```
 
 
@@ -971,6 +1054,8 @@ df$dietary_diversity_score[is.na(df$icfi_milk_score) & is.na(df$icfi_meat_score)
                             is.na(df$icfi_lentils_score) & is.na(df$icfi_dairy_score) &
                             is.na(df$icfi_starchy_staples_score) & is.na(df$icfi_vitA_score) &
                             is.na(df$icfi_other_fruits_score)] <- NA
+
+recoded_vars <- append(recoded_vars, "dietary_diversity_score")
 ```
 
 xtile dd_quintile = dietary_diversity_score if child_age > = 6 & elig == 1, nq(4)
@@ -979,7 +1064,9 @@ xtile dd_quintile = dietary_diversity_score if child_age > = 6 & elig == 1, nq(4
 df  <- df %>%
   filter(child_age >= 6, elig == 1) %>% # Filter the df
   mutate(dd_quintile = ntile(dietary_diversity_score, 4)) %>% # Create the quintiles
-  ungroup() 
+  ungroup()
+
+recoded_vars <- append(recoded_vars, "dd_quintile")
 ```
 
 capture drop bf_start
@@ -996,6 +1083,8 @@ df <- df %>%
   mutate(bf_start = fct_case_when(v426 >= 0 & v426 <= 101 ~ "1. within first hour",
                                   v426 >= 102 & v426 <= 299 ~ "2. after 1hr",
                                   v426 == 99 | is.na(v426) ~ NA_character_))
+
+recoded_vars <- append(recoded_vars, "bf_start")
 ```
 
 capture drop infectious_disease
@@ -1016,6 +1105,8 @@ df <- df %>%
       TRUE ~ NA_real_
     )
   )
+
+recoded_vars <- append(recoded_vars, "infectious_disease")
 ```
 
 capture drop water_source*
@@ -1026,7 +1117,7 @@ recode hv201 (11 12  = 1 "1. piped") ///
 ```{r}
 # Remove 'water_source' variable if it exists
 if ("water_source" %in% colnames(df)) {
-  df$infectious_disease <- NULL
+  df$water_source <- NULL
 }
 # Recode the variable "hv201" and create a new variable called "water_source"
 df <- df %>% 
@@ -1036,6 +1127,8 @@ df <- df %>%
     hv201 == 96 ~ NA_character_,
     TRUE ~ NA_character_
   ))
+
+recoded_vars <- append(recoded_vars, "water_source")
 ```
 
 capture drop water_treatment
@@ -1056,6 +1149,8 @@ df <- df %>%
     hv237 == 8 ~ NA_character_,
     TRUE ~ NA_character_
   ))
+
+recoded_vars <- append(recoded_vars, "water_treatment")
 ```
 
 capture drop stool_disposal
@@ -1074,6 +1169,8 @@ df <- df %>%
     between(v465, 1, 5) ~ "1. proper disposal",
     TRUE ~ NA_character_
   ))
+
+recoded_vars <- append(recoded_vars, "stool_disposal")
 ```
 
 
@@ -1100,15 +1197,12 @@ df <- df %>%
 # Replace "toilet_type" with missing values if "child_age" is greater than 60
 df$toilet_type[df$child_age > 60] <- NA_character_
 
-
-
 df$toliet_access_no <- ifelse(df$toilet_type == "0. no toilet", 1,0)  %>% as.factor()
 
+
+recoded_vars <- append(recoded_vars, "toilet_type")
+recoded_vars <- append(recoded_vars, "toliet_access_no")
 ```
-
-
-
-
 
 recode hv225 (0 = 0 "0. no") (1 = 1 "1. yes"), gen(toiletshare)
 
@@ -1120,6 +1214,8 @@ df <- df %>%
     hv225 == 1 ~ "1. yes",
     TRUE ~ NA_character_
   ))
+
+recoded_vars <- append(recoded_vars, "toiletshare")
 ```
 
 capture drop fuel_type 
@@ -1141,9 +1237,17 @@ df <- df %>%
     hv226 == 96 ~ NA_character_,
     TRUE ~ NA_character_
   ))
+
+recoded_vars <- append(recoded_vars, "fuel_type")
 ```
 
 
+capture drop cooking_fuel
+gen cooking_fuel = . 
+replace cooking_fuel = 1 if fuel_type == 1
+replace cooking_fuel = 0 if fuel_type == 2 | fuel_type == 3
+label define cooking_fuel 0 "0. solid fuel" 1 "1. non-solid fuel"
+label value cooking_fuel cooking_fuel
 ```{r}
 # remove cooking_fuel if it exists
 if ("cooking_fuel" %in% names(df)) {
@@ -1157,9 +1261,11 @@ df$cooking_fuel <- case_when(
 ) %>% as.factor()
 
 df$cooking_fuel_solid <- ifelse(df$cooking_fuel == 0, 1, 0) %>% as.factor()
+recoded_vars <- append(recoded_vars, "cooking_fuel_solid")
 
+levels(df$cooking_fuel) <- c("0. solid fuel", "1. non-solid fuel")
+recoded_vars <- append(recoded_vars, "cooking_fuel")
 ```
-
 
 capture drop kitchen
 gen kitchen = hv242
@@ -1177,13 +1283,12 @@ df <- df %>%
   mutate(kitchen = ifelse(hv241 == 2 | hv241 == 3, 1, kitchen))
 
 df$kitchen <- as.factor(df$kitchen)
-```
 
+recoded_vars <- append(recoded_vars, "kitchen")
 
-```{r}
 df$separate_kitchen_no <- ifelse(df$kitchen == 0, 1,0)  %>% as.factor()
+recoded_vars <- append(recoded_vars, "separate_kitchen_no")
 ```
-
 
 
 capture drop air_quality //Basani et al 2010, from Subramanian
@@ -1215,6 +1320,8 @@ df <- df %>%
                                   "1. non-solid fuels" = "1",
                                   "solid fuels in separate kitchen" = "2",
                                   "solid fuels in non-separate kitchen" = "3"))
+
+recoded_vars <- append(recoded_vars, "air_quality")
 ```
 
 capture drop vitamin_a
@@ -1235,6 +1342,8 @@ df <- df %>%
   mutate(vitamin_a = ifelse(h34 == 1, 1, vitamin_a))
 
 df$vitamin_a <- as.factor(df$vitamin_a)
+
+recoded_vars <- append(recoded_vars, "vitamin_a")
 ```
 
 ren hw57 child_anemia
@@ -1245,6 +1354,8 @@ df <- df %>%
   rename(child_anemia = hw57) 
 
 df$child_anemia <- as.factor(df$child_anemia)
+
+recoded_vars <- append(recoded_vars, "child_anemia")
 ```
 
 capture drop full_vaccination
@@ -1270,6 +1381,8 @@ df <- df %>%
                                       (h6 %in% 1:3) & (h7 %in% 1:3) & (h8 %in% 1:3) & (h9 %in% 1:3), 1, full_vaccination))
 
 df$full_vaccination <- as.factor(df$full_vaccination)
+
+recoded_vars <- append(recoded_vars, "full_vaccination")
 ```
 
 capture drop female
@@ -1291,6 +1404,8 @@ df <- df %>%
   mutate(female = fct_recode(as.factor(female),
                              "0. male" = "0",
                              "1. female" = "1"))
+
+recoded_vars <- append(recoded_vars, "female")
 ```
 
 ```{r}
@@ -1304,6 +1419,8 @@ df <- df %>%
                                    1,
                                    0)  %>% as.factor())
 df$sex_male
+
+recoded_vars <- append(recoded_vars, "sex_male")
 ```
 
 capture drop total_children_born
@@ -1318,6 +1435,8 @@ if ("total_children_born" %in% colnames(df)) {
 # Create 'total_children_born' variable based on 'v201'
 df <- df %>%
   mutate(total_children_born = v201)
+
+recoded_vars <- append(recoded_vars, "total_children_born")
 ```
 
 capture drop total_living_children
@@ -1357,10 +1476,16 @@ df <- df %>%
          ),
          siblings_bin = factor(siblings_bin, levels = c("1. 0 or 1", "2. 2 or more")),
          birth_order = hc64)
+
+recoded_vars <- append(recoded_vars, "total_living_children")
+recoded_vars <- append(recoded_vars, "siblings")
+recoded_vars <- append(recoded_vars, "siblings_2")
+recoded_vars <- append(recoded_vars, "siblings_bin")
+recoded_vars <- append(recoded_vars, "birth_order")
 ```
 
 ```{r}
-# Remove 'female' variable if it exists
+# Remove 'num_siblings_two_or_more' variable if it exists
 if ("num_siblings_two_or_more" %in% colnames(df)) {
   df$num_siblings_two_or_more  <- NULL
 }
@@ -1368,6 +1493,8 @@ if ("num_siblings_two_or_more" %in% colnames(df)) {
 df = df %>% 
   mutate(num_siblings_two_or_more = ifelse(df$siblings_bin == "2. 2 or more", 1, 0)  %>% 
            as.factor())
+
+recoded_vars <- append(recoded_vars, "num_siblings_two_or_more")
 ```
 
 
@@ -1386,6 +1513,8 @@ df <- df %>%
   mutate(child_alive = b5)
 
 df$child_alive <- as.factor(df$child_alive)
+
+recoded_vars <- append(recoded_vars, "child_alive")
 ```
 
 
@@ -1406,7 +1535,561 @@ df <- df %>%
 # Sort the df by "mother_id" and "midx"
 df <- df %>% 
   arrange(mother_id, midx)
+
+recoded_vars <- append(recoded_vars, "last_child_id")
 ```
+
+
+```{r}
+# First, drop the variable if it already exists
+if ("sibling_under5" %in% names(df)) {
+  df$sibling_under5 <- NULL
+}
+
+# Now, recode v208 into sibling_under5
+df$sibling_under5 <- ifelse(df$v208 == 1, 0,
+                                   ifelse(df$v208 == 2, 1,
+                                          ifelse(df$v208 == 3, 2,
+                                                 ifelse(df$v208 >= 4 & df$v208 <= 6, 3, NA))))
+# Label the categories
+levels(df$sibling_under5) <- c("0. none", "1. one", "2. two", "3. 3 or more")
+
+recoded_vars <- append(recoded_vars, "sibling_under5")
+```
+
+
+```{r}
+# Remove 'pre_birth_interval' variable if it exists
+vars_to_remove <- c("pre_birth_interval")
+df <- df[, !(colnames(df) %in% vars_to_remove)]
+
+# Recode 'b11' values and create 'pre_birth_interval' column
+df <- df %>%
+  mutate(pre_birth_interval = case_when(
+    (b11 >= 0 & b11 <= 23) ~ "2. < 24 months",
+    (b11 >= 24 & b11 <= 400) ~ "1. 24+ or first child"
+  ))
+
+# Replace 'pre_birth_interval' with "1. 24+ or first child" if 'siblings' is 0
+df <- df %>%
+  mutate(pre_birth_interval = ifelse(siblings == 0, "1. 24+ or first child", pre_birth_interval))
+
+# Recode 'b12' values and create 'succeeding_birth_interval' column
+df <- df %>%
+  mutate(succeeding_birth_interval = case_when(
+    (b12 >= 0 & b12 <= 23) ~ "1. < 24 months",
+    (b12 >= 24 & b12 <= 400) ~ "0. 24+"
+  ))
+
+recoded_vars <- append(recoded_vars, "pre_birth_interval")
+```
+
+```{r}
+# Remove 'pre_birth_interval_less_than_equal_to_24_months' variable if it exists
+if ("pre_birth_interval_less_than_equal_to_24_months" %in% colnames(df)) {
+  df$pre_birth_interval_less_than_equal_to_24_months <- NULL
+}
+
+df <- df %>%
+  mutate(pre_birth_interval_less_than_equal_to_24_months = ifelse(df$pre_birth_interval == "2. < 24 months", 1, 0)  %>% as.factor())
+
+recoded_vars <- append(recoded_vars, "pre_birth_interval_less_than_equal_to_24_months")
+```
+
+
+capture drop  brothers brothers_count
+gen brothers_count = v202
+replace brothers_count = brothers_count-1 if female == 0 & brothers_count !=0
+capture drop brothers_home
+recode brothers_count (2 = 2 "2. 2 ")(3/10 = 3 "3. 3 or more"), gen(brothers_home)
+
+capture drop sisters sisters_count
+gen sisters_count = v203
+replace sisters_count = sisters_count-1 if female == 1 & sisters_count !=0
+capture drop sisters_home
+recode sisters_count (2 = 2 "2. 2")(3/10 = 3 "3. 3 or more"), gen(sisters_home)
+
+capture drop bpl_card
+recode sh58 (0 = 0 "0. no") (1 = 1 "1. yes") (8/. = .), gen(bpl_card)
+
+capture drop preg_deworm
+recode m60 (0 = 0 "0.no")(1 = 1 "1.yes")(7/9 = . ), gen(preg_deworm)
+
+capture drop preg_ironyn
+recode m45 (0 = 0 "0.no")(1 = 1 "1.yes")(7/9 = . ), gen(preg_ironyn)  
+
+capture drop preg_iron
+recode m46 (1/30 = 1 "1. 1 mo or less") (31/90 = 2 "2. 1-3 mo")(91/180 = 3 "3. 3-6 mo")(180/300 = 4 "4. 6+ mo")(997/999 = .), gen(preg_iron)
+replace preg_iron = 0 if preg_ironyn == 0
+
+capture drop delivery_place
+recode m15 (11/13 = 1 "1. at home") (21/33 = 2 "2. at HC facility") (96 = .), gen(delivery_place)
+
+capture drop child_deworm
+recode h43 (0 = 0 "0.no")(1 = 1 "1.yes")(7/9 = . ), gen(child_deworm)  
+
+capture drop child_cough
+recode h31 (0 = 0 "0.no")(2 = 1 "1.yes")(8 = . ), gen(child_cough) 
+
+```{r}
+df$brothers_count <- df$v202
+
+# Subtract 1 from 'brothers_count' if 'female' is 0 and 'brothers_count' is not 0
+df$brothers_count <- ifelse(df$female == 0 & df$brothers_count != 0, df$brothers_count - 1, df$brothers_count)
+
+# Drop 'brothers_home' column and create 'brothers_home' with the recoded values of 'brothers_count'
+df$brothers_home <- case_when(
+  df$brothers_count == 2 ~ "2. 2",
+  df$brothers_count >= 3 & df$brothers_count <= 10 ~ "3. 3 or more",
+  TRUE ~ NA_character_
+)
+
+recoded_vars <- append(recoded_vars, "brothers_count")
+recoded_vars <- append(recoded_vars, "brothers_home")
+```
+
+```{r}
+# Drop 'sisters' and 'sisters_count' columns and create 'sisters_count' with 'v203' values
+df$sisters_count <- df$v203
+
+# Subtract 1 from 'sisters_count' if 'female' is 1 and 'sisters_count' is not 0
+df$sisters_count <- ifelse(df$female == 1 & df$sisters_count != 0, df$sisters_count - 1, df$sisters_count)
+
+# Drop 'sisters_home' column and create 'sisters_home' with the recoded values of 'sisters_count'
+df$sisters_home <- case_when(
+  df$sisters_count == 2 ~ "2. 2",
+  df$sisters_count >= 3 & df$sisters_count <= 10 ~ "3. 3 or more",
+  TRUE ~ NA_character_
+)
+
+recoded_vars <- append(recoded_vars, "sisters_count")
+recoded_vars <- append(recoded_vars, "sisters_home")
+```
+
+
+```{r}
+# sh58 variable (Household has a BPL card) is present in the 2015-16 survey but not in the 2019-21
+# Drop 'bpl_card' column and create 'bpl_card' with the recoded values of 'sh58'
+#df$bpl_card <- case_when(
+#  df$sh58 == 0 ~ "0. no",
+#  df$sh58 == 1 ~ "1. yes",
+#  is.na(df$sh58) ~ NA_character_,
+#  TRUE ~ NA_character_
+#)
+```
+
+
+```{r}
+# Drop 'preg_deworm' column and create 'preg_deworm' with the recoded values of 'm60'
+df$preg_deworm <- case_when(
+  df$m60 == 0 ~ "0.no",
+  df$m60 == 1 ~ "1.yes",
+  df$m60 >= 7 & df$m60 <= 9 ~ NA_character_,
+  TRUE ~ NA_character_
+)
+
+# Recode 'm45' variable and create 'preg_ironyn' variable
+df <- df %>%
+  mutate(preg_ironyn = case_when(
+    m45 == 0 ~ "0.no",
+    m45 == 1 ~ "1.yes",
+    m45 >= 7 & m45 <= 9 ~ NA_character_,
+    TRUE ~ NA_character_
+  ))
+
+# Recode 'm46' variable and create 'preg_iron' variable
+df <- df %>%
+  mutate(preg_iron = case_when(
+    m46 >= 1 & m46 <= 30 ~ "1. 1 mo or less",
+    m46 >= 31 & m46 <= 90 ~ "2. 1-3 mo",
+    m46 >= 91 & m46 <= 180 ~ "3. 3-6 mo",
+    m46 >= 180 & m46 <= 300 ~ "4. 6+ mo",
+    m46 >= 997 & m46 <= 999 ~ NA_character_,
+    TRUE ~ NA_character_
+  ))
+
+# Replace values in 'preg_iron' with 0 where 'preg_ironyn' is 0
+df$preg_iron <- ifelse(df$preg_ironyn == "0.no", 0, df$preg_iron)
+
+
+# Recode 'm15' variable and create 'delivery_place' variable
+df <- df %>%
+  mutate(delivery_place = case_when(
+    m15 >= 11 & m15 <= 13 ~ "1. at home",
+    m15 >= 21 & m15 <= 33 ~ "2. at HC facility",
+    m15 == 96 ~ NA_character_,
+    TRUE ~ NA_character_
+  ))
+
+# Recode 'h43' variable and create 'child_deworm' variable
+df <- df %>%
+  mutate(child_deworm = case_when(
+    h43 == 0 ~ "0.no",
+    h43 == 1 ~ "1.yes",
+    h43 >= 7 & h43 <= 9 ~ NA_character_,
+    TRUE ~ NA_character_
+  ))
+
+df <- df  %>% 
+  mutate(child_cough = case_when(h31 == 0 ~ 0, 
+                                 h31 == 2 ~ 1, 
+                                 TRUE ~ NA_real_))
+
+df$child_cough <- as.factor(df$child_cough)
+
+recoded_vars <- append(recoded_vars, "preg_deworm")
+recoded_vars <- append(recoded_vars, "preg_ironyn")
+recoded_vars <- append(recoded_vars, "preg_iron")
+recoded_vars <- append(recoded_vars, "delivery_place")
+recoded_vars <- append(recoded_vars, "child_deworm")
+recoded_vars <- append(recoded_vars, "child_cough")
+```
+
+
+capture drop child_fever
+recode h22 (0 = 0 "0.no")(1= 1 "1.yes")(8 = . ), gen(child_fever) 
+
+```{r}
+# Drop variables starting with 'child_fever'
+if ("child_fever" %in% names(df)) {
+  df <- df %>% select(-starts_with("child_fever"))
+}
+
+# Recode 'h22' variable into 'child_fever' variable
+df <- df %>% mutate(child_fever = case_when(
+  h22 == 0 ~ "0.no",
+  h22 == 1 ~ "1.yes",
+  h22 == 8 ~ NA_character_, # missing
+  TRUE ~ NA_character_ # all other cases
+))
+
+recoded_vars <- append(recoded_vars, "child_fever")
+```
+
+
+capture drop child_diarrhea
+recode h11 (0 = 0 "0.no")(2 = 1 "1.yes")(8 = . ), gen(child_diarrhea)  
+
+```{r}
+# Drop variables starting with 'child_diarrhea'
+if ("child_diarrhea" %in% names(df)) {
+  df <- df %>% select(-starts_with("child_diarrhea"))
+}
+
+# Recode 'h11' variable into 'child_diarrhea' variable
+df <- df %>% mutate(child_diarrhea = case_when(
+  h11 == 0 ~ "0.no",
+  h11 == 2 ~ "1.yes",
+  h11 == 8 ~ NA_character_, # missing
+  TRUE ~ NA_character_ # all other cases
+))
+
+recoded_vars <- append(recoded_vars, "child_diarrhea")
+```
+
+
+capture drop birthweight
+recode m19 (500/1800 = 1 "1. 1800g or less")(1801/2500 = 2 "2. 1801 to 2500g")(2501/9000 = 3 "3. more than 2500g")(9990/. = .),gen(birthweight)
+
+```{r}
+# Drop variables starting with 'birthweight'
+if ("birthweight" %in% names(df)) {
+  df <- df %>% select(-starts_with("birthweight"))
+}
+
+# Recode 'm19' variable into 'birthweight' variable
+df <- df %>% mutate(birthweight = case_when(
+  m19 >= 500 & m19 <= 1800 ~ "1. 1800g or less",
+  m19 >= 1801 & m19 <= 2500 ~ "2. 1801 to 2500g",
+  m19 >= 2501 & m19 <= 9000 ~ "3. more than 2500g",
+  m19 == 9990 ~ NA_character_, # missing
+  TRUE ~ NA_character_ # all other cases
+))
+
+recoded_vars <- append(recoded_vars, "birthweight")
+```
+
+```{r}
+# Drop variables starting with 'birth_weight_less_than_1800_g', `birth_weight_1800_g_2500_g`
+if ("birth_weight_less_than_1800_g" %in% names(df)) {
+  df <- df %>% select(-starts_with("birth_weight_less_than_1800_g"))
+}
+
+if ("birth_weight_1800_g_2500_g" %in% names(df)) {
+  df <- df %>% select(-starts_with("birth_weight_1800_g_2500_g"))
+}
+
+df <- df %>%
+  mutate(birth_weight_less_than_1800_g = ifelse(df$birthweight == "1. 1800g or less", 1, 0)  %>% as.factor(),
+         birth_weight_1800_g_2500_g = ifelse(df$birthweight == "2. 1801 to 2500g", 1, 0) %>% as.factor())
+
+recoded_vars <- append(recoded_vars, "birth_weight_less_than_1800_g")
+recoded_vars <- append(recoded_vars, "birth_weight_1800_g_2500_g")
+```
+
+
+capture drop multiplet
+recode b0 (10 = 0 "0. no") (1/3 = 1 "1. yes"), gen(multiplet)
+
+```{r}
+# Drop variables starting with 'multiplet'
+if ("multiplet" %in% names(df)) {
+  df <- df %>% select(-starts_with("multiplet"))
+}
+
+# Recode 'b0' variable into 'multiplet' variable
+df <- df %>% mutate(multiplet = case_when(
+  b0 == 10 ~ "0. no",
+  b0 %in% 1:3 ~ "1. yes",
+  TRUE ~ NA_character_ # all other cases
+))
+
+recoded_vars <- append(recoded_vars, "multiplet")
+```
+
+
+capture drop caste
+recode sh36 (1 = 4 "4. Scheduled Caste")(2 = 3 "3. Scheduled Tribe")(3 = 2 "Other backward caste") (4 = 1 "None")(8=.), gen(caste)
+replace caste = 1 if sh35 == 993 | sh35 == 998
+
+```{r}
+# Variables sh35/sh36 in 2015-16 survey (caste or tribe of household head, Type of caste or tribe of the household head) were replaced by SH48 and SH49 in 2019-21 
+
+# Drop variables starting with 'caste'
+if ("caste" %in% names(df)) {
+  df <- df %>% select(-starts_with("caste"))
+}
+
+# Recode 'sh49' variable into 'caste' variable
+df <- df %>% mutate(caste = fct_case_when(
+  sh49 == 1 ~ "4. Scheduled Caste",
+  sh49 == 2 ~ "3. Scheduled Tribe",
+  sh49 == 3 ~ "2. Other backward caste",
+  sh49 == 4 ~ "1. None",
+  sh49 == 8 ~ NA_character_, # missing
+  TRUE ~ NA_character_ # all other cases
+))
+
+# Replace 'caste' value with 1 if 'sh48' equals 993 or 998
+df <- df %>% mutate(caste = if_else(sh48 %in% c(993, 998), "1. None", caste))
+
+recoded_vars <- append(recoded_vars, "caste")
+```
+
+
+capture drop religion
+recode v130 (1 4/8 = 1 "1. Hindu+") (2 = 2 "2. muslim")(3 = 3 "3. christian") (9/96 = 4 "4. other"), gen(religion)
+
+```{r}
+# Drop variables starting with 'religion'
+if ("religion" %in% names(df)) {
+  df <- df %>% select(-starts_with("religion"))
+}
+
+# Recode 'v130' variable into 'religion' variable
+df <- df %>% mutate(religion = case_when(
+  v130 %in% c(1, 4:8) ~ "1. Hindu+",
+  v130 == 2 ~ "2. Muslim",
+  v130 == 3 ~ "3. Christian",
+  v130 >= 9 & v130 <= 96 ~ "4. Other",
+  TRUE ~ NA_character_ # all other cases
+))
+
+recoded_vars <- append(recoded_vars, "religion")
+```
+
+
+capture drop rural
+recode v025 (1 = 0 "0. urban")(2 = 1 "1. rural"), gen(rural)
+
+```{r}
+# Drop variables starting with 'rural'
+if ("rural" %in% names(df)) {
+  df <- df %>% select(-starts_with("rural"))
+}
+
+# Recode 'v025' variable into 'rural' variable
+df <- df %>% mutate(rural = case_when(
+  v025 == 1 ~ "0. urban",
+  v025 == 2 ~ "1. rural",
+  TRUE ~ NA_character_ # all other cases
+))
+
+recoded_vars <- append(recoded_vars, "rural")
+```
+
+
+capture drop mother_education 
+recode v133 (0 = 0 "0. no education") (1/7 = 1 "1. primary") ///
+(8/10 = 2 "2. secondary") (11/12 = 3 "3. higher secondary") (13/22 = 4 "4. college") (99 = .), gen (mother_education)
+
+
+```{r}
+# Drop variables starting with 'mother_education'
+if ("mother_education" %in% names(df)) {
+  df <- df %>% select(-starts_with("mother_education"))
+}
+
+# Create 'mother_education' column based on 'v133' values
+df$mother_education <- ifelse(df$v133 == 0, 0,
+                              ifelse(df$v133 >= 1 & df$v133 <= 7, 1,
+                                     ifelse(df$v133 >= 8 & df$v133 <= 10, 2,
+                                            ifelse(df$v133 >= 11 & df$v133 <= 12, 3,
+                                                   ifelse(df$v133 >= 13 & df$v133 <= 22, 4, NA
+                                                   )))))
+
+recoded_vars <- append(recoded_vars, "mother_education")
+```
+
+```{r}
+# Drop variables starting with 'maternal_edu_no' 'maternal_edu_1_7' 'maternal_edu_greater_7_10'
+if ("maternal_edu_no" %in% names(df)) {
+  df <- df %>% select(-starts_with("maternal_edu_no"))
+}
+
+if ("maternal_edu_1_7" %in% names(df)) {
+  df <- df %>% select(-starts_with("maternal_edu_1_7"))
+}
+
+if ("maternal_edu_greater_7_10" %in% names(df)) {
+  df <- df %>% select(-starts_with("maternal_edu_greater_7_10"))
+}
+
+
+df <- df %>% 
+  mutate(maternal_edu_no = ifelse(df$v133 == 0, 1, 0) %>% as.factor(),
+         maternal_edu_1_7 = ifelse(df$v133 >= 1 & df$v133 <= 7,
+                              1, 0) %>% as.factor(),
+         maternal_edu_greater_7_10 = ifelse(df$v133 >= 7 & df$v133 <= 10,
+                              1, 0) %>% as.factor())
+
+recoded_vars <- append(recoded_vars, "maternal_edu_no")
+```
+
+
+capture drop season //designated by India Meteorological Department http://imd.gov.in/section/nhac/wxfaq.pdf
+recode v006 (1/3 12 = 1 "1. Winter")(4/6 = 2 "2. Summer") (7/9 = 3 "3. Monsoon") (10/11 = 4 "4. Post-Monsoon"), gen(season)
+
+```{r}
+# Drop variables starting with 'season'
+if ("season" %in% names(df)) {
+  df <- df %>% select(-starts_with("season"))
+}
+
+# Recode 'v006' variable into 'season' variable
+df <- df %>% mutate(season = case_when(
+  v006 %in% c(1, 2, 3, 12) ~ "1. Winter",
+  v006 %in% 4:6 ~ "2. Summer",
+  v006 %in% 7:9 ~ "3. Monsoon",
+  v006 %in% 10:11 ~ "4. Post-Monsoon",
+  TRUE ~ NA_character_ # all other cases
+))
+
+recoded_vars <- append(recoded_vars, "season")
+```
+
+ren s564 anganwadi_support
+
+```{r}
+## Variable s564 (While breastfeeding, received benefits from ang) in 2015-16 appears to be renamed to S567 (When you were breastfeeding child did you recei) in 2019-21
+
+# Rename variable 's567' to 'anganwadi_support'
+df <- df %>% rename(anganwadi_support = s567)
+
+recoded_vars <- append(recoded_vars, "anganwadi_support")
+```
+
+
+capture drop anc_visits
+recode m14 (0 = 0 "0. no visits")(1/3 = 1 "1. 1-3 visits")(4/30 = 2 "2. 4 or more visits")(98=.), gen(anc_visits)"
+
+```{r}
+# Drop variables starting with 'anc_visits'
+if ("anc_visits" %in% names(df)) {
+  df <- df %>% select(-starts_with("anc_visits"))
+}
+
+
+# Recode 'm14' variable into 'anc_visits' variable
+df <- df %>% mutate(anc_visits = case_when(
+  m14 == 0 ~ "0. no visits",
+  m14 >= 1 & m14 <= 3 ~ "1. 1-3 visits",
+  m14 >= 4 & m14 <= 30 ~ "2. 4 or more visits",
+  m14 == 98 ~ NA_character_, # missing
+  TRUE ~ NA_character_ # all other cases
+))
+
+recoded_vars <- append(recoded_vars, "anc_visits")
+```
+
+
+/*capture drop covariate_nonmissing
+gen covariate_nonmissing = 0
+replace covariate_nonmissing = 1 if  wealth_quintile != . & mother_education !=. ///
+& maternal_height !=. & maternal_bmi !=. & marital_age!= . & dietary_diversity !=. & bf_start !=. ///
+& infectious_disease !=. & water_source !=. & toilet_type !=. & air_quality !=. & iodized_salt !=. /// 
+& full_vaccination !=. & vitamin_a !=.
+
+```{r}
+# Unknown variable: Ionized Salt
+
+# Create a new variable 'covariate_nonmissing' and initialize it to 0
+df$covariate_nonmissing <- 0
+
+# Use 'ifelse()' to set 'covariate_nonmissing' to 1 where all specified variables are non-missing
+df$covariate_nonmissing <- ifelse(
+  !is.na(df$wealth_quintile) & !is.na(df$mother_education) &
+  !is.na(df$maternal_height) & !is.na(df$maternal_bmi) &
+  !is.na(df$marital_age) & !is.na(df$dietary_diversity) &
+  !is.na(df$bf_start) & !is.na(df$infectious_disease) &
+  !is.na(df$water_source) & !is.na(df$toilet_type) &
+  !is.na(df$air_quality) & 
+  #!is.na(df$iodized_salt) & # Ionized salt variable not found
+  !is.na(df$full_vaccination) & !is.na(df$vitamin_a),
+  1, df$covariate_nonmissing
+)
+
+df$covariate_nonmissing <- df$covariate_nonmissing %>% as.factor()
+
+recoded_vars <- append(recoded_vars, "covariate_nonmissing")
+```
+
+
+* decisionmaking 743a-v743f; v43e not measured
+* domestic violence: v744a v744b v744c v744d v744e s936f s936g
+* rough sample size under 25 y, last child = 17k
+capture drop fem_aut*
+recode v743a (1 = 1)(2 = 0.5)(4/6=0), gen(fem_aut_hc)
+recode v743b (1 = 1)(2 = 0.5)(4/6=0), gen(fem_aut_large)
+recode v743d (1 = 1)(2 = 0.5)(4/6=0), gen(fem_aut_daily)
+recode v743f (1 = 1)(2 = 0.5)(4/6=0), gen(fem_aut_visits)
+qui bysort hhid (fem_aut_hc): replace fem_aut_hc = fem_aut_hc[1]
+qui bysort hhid (fem_aut_large): replace fem_aut_large = fem_aut_large[1]
+qui bysort hhid (fem_aut_daily): replace fem_aut_daily = fem_aut_daily[1]
+qui bysort hhid (fem_aut_visits): replace fem_aut_visits = fem_aut_visits[1]
+
+
+```{r}
+df <- df %>%
+  select(-starts_with("fem_aut")) %>%
+  mutate(fem_aut_hc = case_when(v743a == 1 ~ 1, v743a == 2 ~ 0.5, between(v743a, 4, 6) ~ 0),
+         fem_aut_large = case_when(v743b == 1 ~ 1, v743b == 2 ~ 0.5, between(v743b, 4, 6) ~ 0),
+         fem_aut_daily = case_when(v743d == 1 ~ 1, v743d == 2 ~ 0.5, between(v743d, 4, 6) ~ 0),
+         fem_aut_visits = case_when(v743f == 1 ~ 1, v743f == 2 ~ 0.5, between(v743f, 4, 6) ~ 0)) %>%
+  group_by(hhid) %>%
+  mutate(fem_aut_hc = fem_aut_hc[1],
+         fem_aut_large = fem_aut_large[1],
+         fem_aut_daily = fem_aut_daily[1],
+         fem_aut_visits = fem_aut_visits[1]) %>%
+  ungroup() %>%
+  select(-starts_with("v743"))
+
+recoded_vars <- append(recoded_vars, "fem_aut_hc")
+recoded_vars <- append(recoded_vars, "fem_aut_large")
+recoded_vars <- append(recoded_vars, "fem_aut_daily")
+recoded_vars <- append(recoded_vars, "fem_aut_visits")
+```
+
 
 capture drop state
 gen state = hv024
@@ -1473,516 +2156,10 @@ df <- df %>%
     state == 23 ~ "36. Mizoram"
   ))
 
-# First, drop the variable if it already exists
-if ("sibling_under5" %in% names(df)) {
-  df$sibling_under5 <- NULL
-}
-
-# Now, recode v208 into sibling_under5
-df$sibling_under5 <- ifelse(df$v208 == 1, 0,
-                                   ifelse(df$v208 == 2, 1,
-                                          ifelse(df$v208 == 3, 2,
-                                                 ifelse(df$v208 >= 4 & df$v208 <= 6, 3, NA))))
-# Label the categories
-levels(df$sibling_under5) <- c("0. none", "1. one", "2. two", "3. 3 or more")
-
+recoded_vars <- append(recoded_vars, "state")
+recoded_vars <- append(recoded_vars, "state_ciaf_rank")
 ```
 
-
-```{r}
-# Remove 'pre_birth_interval' variable if it exists
-vars_to_remove <- c("pre_birth_interval")
-df <- df[, !(colnames(df) %in% vars_to_remove)]
-
-# Recode 'b11' values and create 'pre_birth_interval' column
-df <- df %>%
-  mutate(pre_birth_interval = case_when(
-    (b11 >= 0 & b11 <= 23) ~ "2. < 24 months",
-    (b11 >= 24 & b11 <= 400) ~ "1. 24+ or first child"
-  ))
-
-# Replace 'pre_birth_interval' with "1. 24+ or first child" if 'siblings' is 0
-df <- df %>%
-  mutate(pre_birth_interval = ifelse(siblings == 0, "1. 24+ or first child", pre_birth_interval))
-
-# Recode 'b12' values and create 'succeeding_birth_interval' column
-df <- df %>%
-  mutate(succeeding_birth_interval = case_when(
-    (b12 >= 0 & b12 <= 23) ~ "1. < 24 months",
-    (b12 >= 24 & b12 <= 400) ~ "0. 24+"
-  ))
-```
-
-```{r}
-# Remove 'pre_birth_interval_less_than_equal_to_24_months' variable if it exists
-if ("pre_birth_interval_less_than_equal_to_24_months" %in% colnames(df)) {
-  df$pre_birth_interval_less_than_equal_to_24_months <- NULL
-}
-
-df <- df %>%
-  mutate(pre_birth_interval_less_than_equal_to_24_months = ifelse(df$pre_birth_interval == "2. < 24 months", 1, 0)  %>% as.factor())
-
-```
-
-
-
-
-capture drop  brothers brothers_count
-gen brothers_count = v202
-replace brothers_count = brothers_count-1 if female == 0 & brothers_count !=0
-capture drop brothers_home
-recode brothers_count (2 = 2 "2. 2 ")(3/10 = 3 "3. 3 or more"), gen(brothers_home)
-
-
-
-capture drop sisters sisters_count
-gen sisters_count = v203
-replace sisters_count = sisters_count-1 if female == 1 & sisters_count !=0
-capture drop sisters_home
-recode sisters_count (2 = 2 "2. 2")(3/10 = 3 "3. 3 or more"), gen(sisters_home)
-
-
-capture drop bpl_card
-recode sh58 (0 = 0 "0. no") (1 = 1 "1. yes") (8/. = .), gen(bpl_card)
-
-
-
-capture drop preg_deworm
-recode m60 (0 = 0 "0.no")(1 = 1 "1.yes")(7/9 = . ), gen(preg_deworm)
-
-capture drop preg_ironyn
-recode m45 (0 = 0 "0.no")(1 = 1 "1.yes")(7/9 = . ), gen(preg_ironyn)  
-
-capture drop preg_iron
-recode m46 (1/30 = 1 "1. 1 mo or less") (31/90 = 2 "2. 1-3 mo")(91/180 = 3 "3. 3-6 mo")(180/300 = 4 "4. 6+ mo")(997/999 = .), gen(preg_iron)
-replace preg_iron = 0 if preg_ironyn == 0
-
-capture drop delivery_place
-recode m15 (11/13 = 1 "1. at home") (21/33 = 2 "2. at HC facility") (96 = .), gen(delivery_place)
-
-capture drop child_deworm
-recode h43 (0 = 0 "0.no")(1 = 1 "1.yes")(7/9 = . ), gen(child_deworm)  
-
-capture drop child_cough
-recode h31 (0 = 0 "0.no")(2 = 1 "1.yes")(8 = . ), gen(child_cough) 
-
-
-```{r}
-df$brothers_count <- df$v202
-
-# Subtract 1 from 'brothers_count' if 'female' is 0 and 'brothers_count' is not 0
-df$brothers_count <- ifelse(df$female == 0 & df$brothers_count != 0, df$brothers_count - 1, df$brothers_count)
-
-# Drop 'brothers_home' column and create 'brothers_home' with the recoded values of 'brothers_count'
-df$brothers_home <- case_when(
-  df$brothers_count == 2 ~ "2. 2",
-  df$brothers_count >= 3 & df$brothers_count <= 10 ~ "3. 3 or more",
-  TRUE ~ NA_character_
-)
-
-# Drop 'sisters' and 'sisters_count' columns and create 'sisters_count' with 'v203' values
-df$sisters_count <- df$v203
-
-# Subtract 1 from 'sisters_count' if 'female' is 1 and 'sisters_count' is not 0
-df$sisters_count <- ifelse(df$female == 1 & df$sisters_count != 0, df$sisters_count - 1, df$sisters_count)
-
-# Drop 'sisters_home' column and create 'sisters_home' with the recoded values of 'sisters_count'
-df$sisters_home <- case_when(
-  df$sisters_count == 2 ~ "2. 2",
-  df$sisters_count >= 3 & df$sisters_count <= 10 ~ "3. 3 or more",
-  TRUE ~ NA_character_
-)
-
-# sh58 variable (Household has a BPL card) is present in the 2015-16 survey but not in the 2019-21
-# Drop 'bpl_card' column and create 'bpl_card' with the recoded values of 'sh58'
-#df$bpl_card <- case_when(
-#  df$sh58 == 0 ~ "0. no",
-#  df$sh58 == 1 ~ "1. yes",
-#  is.na(df$sh58) ~ NA_character_,
-#  TRUE ~ NA_character_
-#)
-
-# Drop 'preg_deworm' column and create 'preg_deworm' with the recoded values of 'm60'
-df$preg_deworm <- case_when(
-  df$m60 == 0 ~ "0.no",
-  df$m60 == 1 ~ "1.yes",
-  df$m60 >= 7 & df$m60 <= 9 ~ NA_character_,
-  TRUE ~ NA_character_
-)
-
-# Recode 'm45' variable and create 'preg_ironyn' variable
-df <- df %>%
-  mutate(preg_ironyn = case_when(
-    m45 == 0 ~ "0.no",
-    m45 == 1 ~ "1.yes",
-    m45 >= 7 & m45 <= 9 ~ NA_character_,
-    TRUE ~ NA_character_
-  ))
-
-# Recode 'm46' variable and create 'preg_iron' variable
-df <- df %>%
-  mutate(preg_iron = case_when(
-    m46 >= 1 & m46 <= 30 ~ "1. 1 mo or less",
-    m46 >= 31 & m46 <= 90 ~ "2. 1-3 mo",
-    m46 >= 91 & m46 <= 180 ~ "3. 3-6 mo",
-    m46 >= 180 & m46 <= 300 ~ "4. 6+ mo",
-    m46 >= 997 & m46 <= 999 ~ NA_character_,
-    TRUE ~ NA_character_
-  ))
-
-# Replace values in 'preg_iron' with 0 where 'preg_ironyn' is 0
-df$preg_iron <- ifelse(df$preg_ironyn == "0.no", 0, df$preg_iron)
-
-
-# Recode 'm15' variable and create 'delivery_place' variable
-df <- df %>%
-  mutate(delivery_place = case_when(
-    m15 >= 11 & m15 <= 13 ~ "1. at home",
-    m15 >= 21 & m15 <= 33 ~ "2. at HC facility",
-    m15 == 96 ~ NA_character_,
-    TRUE ~ NA_character_
-  ))
-
-# Recode 'h43' variable and create 'child_deworm' variable
-df <- df %>%
-  mutate(child_deworm = case_when(
-    h43 == 0 ~ "0.no",
-    h43 == 1 ~ "1.yes",
-    h43 >= 7 & h43 <= 9 ~ NA_character_,
-    TRUE ~ NA_character_
-  ))
-
-
-df <- df  %>% 
-  mutate(child_cough = case_when(h31 == 0 ~ 0, 
-                                 h31 == 2 ~ 1, 
-                                 TRUE ~ NA_real_))
-
-df$child_cough <- as.factor(df$child_cough)
-
-```
-
-capture drop child_fever
-recode h22 (0 = 0 "0.no")(1= 1 "1.yes")(8 = . ), gen(child_fever) 
-
-```{r}
-# Drop variables starting with 'child_fever'
-if ("child_fever" %in% names(df)) {
-  df <- df %>% select(-starts_with("child_fever"))
-}
-
-# Recode 'h22' variable into 'child_fever' variable
-df <- df %>% mutate(child_fever = case_when(
-  h22 == 0 ~ "0.no",
-  h22 == 1 ~ "1.yes",
-  h22 == 8 ~ NA_character_, # missing
-  TRUE ~ NA_character_ # all other cases
-))
-```
-
-
-capture drop child_diarrhea
-recode h11 (0 = 0 "0.no")(2 = 1 "1.yes")(8 = . ), gen(child_diarrhea)  
-
-```{r}
-# Drop variables starting with 'child_diarrhea'
-if ("child_diarrhea" %in% names(df)) {
-  df <- df %>% select(-starts_with("child_diarrhea"))
-}
-
-# Recode 'h11' variable into 'child_diarrhea' variable
-df <- df %>% mutate(child_diarrhea = case_when(
-  h11 == 0 ~ "0.no",
-  h11 == 2 ~ "1.yes",
-  h11 == 8 ~ NA_character_, # missing
-  TRUE ~ NA_character_ # all other cases
-))
-```
-
-
-capture drop birthweight
-recode m19 (500/1800 = 1 "1. 1800g or less")(1801/2500 = 2 "2. 1801 to 2500g")(2501/9000 = 3 "3. more than 2500g")(9990/. = .),gen(birthweight)
-
-```{r}
-# Drop variables starting with 'birthweight'
-if ("birthweight" %in% names(df)) {
-  df <- df %>% select(-starts_with("birthweight"))
-}
-
-
-# Recode 'm19' variable into 'birthweight' variable
-df <- df %>% mutate(birthweight = case_when(
-  m19 >= 500 & m19 <= 1800 ~ "1. 1800g or less",
-  m19 >= 1801 & m19 <= 2500 ~ "2. 1801 to 2500g",
-  m19 >= 2501 & m19 <= 9000 ~ "3. more than 2500g",
-  m19 == 9990 ~ NA_character_, # missing
-  TRUE ~ NA_character_ # all other cases
-))
-```
-
-
-```{r}
-# Drop variables starting with 'birth_weight_less_than_1800_g', `birth_weight_1800_g_2500_g`
-if ("birth_weight_less_than_1800_g" %in% names(df)) {
-  df <- df %>% select(-starts_with("birth_weight_less_than_1800_g"))
-}
-
-if ("birth_weight_1800_g_2500_g" %in% names(df)) {
-  df <- df %>% select(-starts_with("birth_weight_1800_g_2500_g"))
-}
-
-df <- df %>%
-  mutate(birth_weight_less_than_1800_g = ifelse(df$birthweight == "1. 1800g or less", 1, 0)  %>% as.factor(),
-         birth_weight_1800_g_2500_g = ifelse(df$birthweight == "2. 1801 to 2500g", 1, 0) %>% as.factor())
-```
-
-capture drop multiplet
-recode b0 (10 = 0 "0. no") (1/3 = 1 "1. yes"), gen(multiplet)
-
-```{r}
-# Drop variables starting with 'multiplet'
-if ("multiplet" %in% names(df)) {
-  df <- df %>% select(-starts_with("multiplet"))
-}
-
-# Recode 'b0' variable into 'multiplet' variable
-df <- df %>% mutate(multiplet = case_when(
-  b0 == 10 ~ "0. no",
-  b0 %in% 1:3 ~ "1. yes",
-  TRUE ~ NA_character_ # all other cases
-))
-```
-
-
-capture drop caste
-recode sh36 (1 = 4 "4. Scheduled Caste")(2 = 3 "3. Scheduled Tribe")(3 = 2 "Other backward caste") (4 = 1 "None")(8=.), gen(caste)
-replace caste = 1 if sh35 == 993 | sh35 == 998
-
-```{r}
-# Variables sh35/sh36 in 2015-16 survey (caste or tribe of household head, Type of caste or tribe of the household head) were replaced by SH48 and SH49 in 2019-21 
-
-# Drop variables starting with 'caste'
-if ("caste" %in% names(df)) {
-  df <- df %>% select(-starts_with("caste"))
-}
-
-# Recode 'sh49' variable into 'caste' variable
-df <- df %>% mutate(caste = fct_case_when(
-  sh49 == 1 ~ "4. Scheduled Caste",
-  sh49 == 2 ~ "3. Scheduled Tribe",
-  sh49 == 3 ~ "2. Other backward caste",
-  sh49 == 4 ~ "1. None",
-  sh49 == 8 ~ NA_character_, # missing
-  TRUE ~ NA_character_ # all other cases
-))
-
-# Replace 'caste' value with 1 if 'sh48' equals 993 or 998
-df <- df %>% mutate(caste = if_else(sh48 %in% c(993, 998), "1. None", caste))
-
-```
-
-
-
-
-
-
-capture drop religion
-recode v130 (1 4/8 = 1 "1. Hindu+") (2 = 2 "2. muslim")(3 = 3 "3. christian") (9/96 = 4 "4. other"), gen(religion)
-
-```{r}
-# Drop variables starting with 'religion'
-if ("religion" %in% names(df)) {
-  df <- df %>% select(-starts_with("religion"))
-}
-
-# Recode 'v130' variable into 'religion' variable
-df <- df %>% mutate(religion = case_when(
-  v130 %in% c(1, 4:8) ~ "1. Hindu+",
-  v130 == 2 ~ "2. Muslim",
-  v130 == 3 ~ "3. Christian",
-  v130 >= 9 & v130 <= 96 ~ "4. Other",
-  TRUE ~ NA_character_ # all other cases
-))
-```
-
-
-capture drop rural
-recode v025 (1 = 0 "0. urban")(2 = 1 "1. rural"), gen(rural)
-
-```{r}
-# Drop variables starting with 'rural'
-if ("rural" %in% names(df)) {
-  df <- df %>% select(-starts_with("rural"))
-}
-
-# Recode 'v025' variable into 'rural' variable
-df <- df %>% mutate(rural = case_when(
-  v025 == 1 ~ "0. urban",
-  v025 == 2 ~ "1. rural",
-  TRUE ~ NA_character_ # all other cases
-))
-```
-
-
-capture drop mother_education 
-recode v133 (0 = 0 "0. no education") (1/7 = 1 "1. primary") ///
-(8/10 = 2 "2. secondary") (11/12 = 3 "3. higher secondary") (13/22 = 4 "4. college") (99 = .), gen (mother_education)
-
-
-```{r}
-# Drop variables starting with 'mother_education'
-if ("mother_education" %in% names(df)) {
-  df <- df %>% select(-starts_with("mother_education"))
-}
-
-# Create 'mother_education' column based on 'v133' values
-df$mother_education <- ifelse(df$v133 == 0, 0,
-                              ifelse(df$v133 >= 1 & df$v133 <= 7, 1,
-                                     ifelse(df$v133 >= 8 & df$v133 <= 10, 2,
-                                            ifelse(df$v133 >= 11 & df$v133 <= 12, 3,
-                                                   ifelse(df$v133 >= 13 & df$v133 <= 22, 4, NA
-                                                   )))))
-
-```
-
-```{r}
-# Drop variables starting with 'maternal_edu_no' 'maternal_edu_1_7' 'maternal_edu_greater_7_10'
-if ("maternal_edu_no" %in% names(df)) {
-  df <- df %>% select(-starts_with("maternal_edu_no"))
-}
-
-if ("maternal_edu_1_7" %in% names(df)) {
-  df <- df %>% select(-starts_with("maternal_edu_1_7"))
-}
-
-if ("maternal_edu_greater_7_10" %in% names(df)) {
-  df <- df %>% select(-starts_with("maternal_edu_greater_7_10"))
-}
-
-
-df <- df %>% 
-  mutate(maternal_edu_no = ifelse(df$v133 == 0, 1, 0) %>% as.factor(),
-         maternal_edu_1_7 = ifelse(df$v133 >= 1 & df$v133 <= 7,
-                              1, 0) %>% as.factor(),
-         maternal_edu_greater_7_10 = ifelse(df$v133 >= 7 & df$v133 <= 10,
-                              1, 0) %>% as.factor())
-
-```
-
-
-
-
-
-capture drop season //designated by India Meteorological Department http://imd.gov.in/section/nhac/wxfaq.pdf
-recode v006 (1/3 12 = 1 "1. Winter")(4/6 = 2 "2. Summer") (7/9 = 3 "3. Monsoon") (10/11 = 4 "4. Post-Monsoon"), gen(season)
-
-```{r}
-# Drop variables starting with 'season'
-if ("season" %in% names(df)) {
-  df <- df %>% select(-starts_with("season"))
-}
-
-# Recode 'v006' variable into 'season' variable
-df <- df %>% mutate(season = case_when(
-  v006 %in% c(1, 2, 3, 12) ~ "1. Winter",
-  v006 %in% 4:6 ~ "2. Summer",
-  v006 %in% 7:9 ~ "3. Monsoon",
-  v006 %in% 10:11 ~ "4. Post-Monsoon",
-  TRUE ~ NA_character_ # all other cases
-))
-```
-
-ren s564 anganwadi_support
-
-```{r}
-## Variable s564 (While breastfeeding, received benefits from ang) in 2015-16 appears to be renamed to S567 (When you were breastfeeding child did you recei) in 2019-21
-
-# Rename variable 's567' to 'anganwadi_support'
-df <- df %>% rename(anganwadi_support = s567)
-```
-
-
-capture drop anc_visits
-recode m14 (0 = 0 "0. no visits")(1/3 = 1 "1. 1-3 visits")(4/30 = 2 "2. 4 or more visits")(98=.), gen(anc_visits)"
-
-```{r}
-# Drop variables starting with 'anc_visits'
-if ("anc_visits" %in% names(df)) {
-  df <- df %>% select(-starts_with("anc_visits"))
-}
-
-
-# Recode 'm14' variable into 'anc_visits' variable
-df <- df %>% mutate(anc_visits = case_when(
-  m14 == 0 ~ "0. no visits",
-  m14 >= 1 & m14 <= 3 ~ "1. 1-3 visits",
-  m14 >= 4 & m14 <= 30 ~ "2. 4 or more visits",
-  m14 == 98 ~ NA_character_, # missing
-  TRUE ~ NA_character_ # all other cases
-))
-```
-
-
-
-/*capture drop covariate_nonmissing
-gen covariate_nonmissing = 0
-replace covariate_nonmissing = 1 if  wealth_quintile != . & mother_education !=. ///
-& maternal_height !=. & maternal_bmi !=. & marital_age!= . & dietary_diversity !=. & bf_start !=. ///
-& infectious_disease !=. & water_source !=. & toilet_type !=. & air_quality !=. & iodized_salt !=. /// 
-& full_vaccination !=. & vitamin_a !=.
-
-```{r}
-# Unknown variable: Ionized Salt
-
-# Create a new variable 'covariate_nonmissing' and initialize it to 0
-df$covariate_nonmissing <- 0
-
-# Use 'ifelse()' to set 'covariate_nonmissing' to 1 where all specified variables are non-missing
-df$covariate_nonmissing <- ifelse(
-  !is.na(df$wealth_quintile) & !is.na(df$mother_education) &
-  !is.na(df$maternal_height) & !is.na(df$maternal_bmi) &
-  !is.na(df$marital_age) & !is.na(df$dietary_diversity) &
-  !is.na(df$bf_start) & !is.na(df$infectious_disease) &
-  !is.na(df$water_source) & !is.na(df$toilet_type) &
-  !is.na(df$air_quality) & 
-  #!is.na(df$iodized_salt) & # Ionized salt variable not found
-  !is.na(df$full_vaccination) & !is.na(df$vitamin_a),
-  1, df$covariate_nonmissing
-)
-
-df$covariate_nonmissing <- df$covariate_nonmissing %>% as.factor()
-```
-
-
-* decisionmaking 743a-v743f; v43e not measured
-* domestic violence: v744a v744b v744c v744d v744e s936f s936g
-* rough sample size under 25 y, last child = 17k
-capture drop fem_aut*
-recode v743a (1 = 1)(2 = 0.5)(4/6=0), gen(fem_aut_hc)
-recode v743b (1 = 1)(2 = 0.5)(4/6=0), gen(fem_aut_large)
-recode v743d (1 = 1)(2 = 0.5)(4/6=0), gen(fem_aut_daily)
-recode v743f (1 = 1)(2 = 0.5)(4/6=0), gen(fem_aut_visits)
-qui bysort hhid (fem_aut_hc): replace fem_aut_hc = fem_aut_hc[1]
-qui bysort hhid (fem_aut_large): replace fem_aut_large = fem_aut_large[1]
-qui bysort hhid (fem_aut_daily): replace fem_aut_daily = fem_aut_daily[1]
-qui bysort hhid (fem_aut_visits): replace fem_aut_visits = fem_aut_visits[1]
-
-
-```{r}
-df <- df %>%
-  select(-starts_with("fem_aut")) %>%
-  mutate(fem_aut_hc = case_when(v743a == 1 ~ 1, v743a == 2 ~ 0.5, between(v743a, 4, 6) ~ 0),
-         fem_aut_large = case_when(v743b == 1 ~ 1, v743b == 2 ~ 0.5, between(v743b, 4, 6) ~ 0),
-         fem_aut_daily = case_when(v743d == 1 ~ 1, v743d == 2 ~ 0.5, between(v743d, 4, 6) ~ 0),
-         fem_aut_visits = case_when(v743f == 1 ~ 1, v743f == 2 ~ 0.5, between(v743f, 4, 6) ~ 0)) %>%
-  group_by(hhid) %>%
-  mutate(fem_aut_hc = fem_aut_hc[1],
-         fem_aut_large = fem_aut_large[1],
-         fem_aut_daily = fem_aut_daily[1],
-         fem_aut_visits = fem_aut_visits[1]) %>%
-  ungroup() %>%
-  select(-starts_with("v743"))
-```
 
 capture drop state_zones
 gen state_zones = . 
@@ -2016,6 +2193,8 @@ df$state_zones <- case_when(
 label_values <- c("1. North-Eastern", "2. North", "3. Central", "4. Eastern", "5. Western", "6. Southern")
 names(label_values) <- 1:6
 df$state_zones <- factor(df$state_zones, levels = 1:6, labels = label_values)
+
+recoded_vars <- append(recoded_vars, "state_zones")
 ```
 
 capture drop eag_state
@@ -2035,6 +2214,8 @@ df$eag_state <- ifelse(
   1,
   0
 )
+
+recoded_vars <- append(recoded_vars, "eag_state")
 ```
 
 
@@ -2072,13 +2253,19 @@ df$focus_states <- case_when(
   df$priority_state == 1 ~ "1. NE Focus",
   df$priority_state %in% c(2, 3) ~ "2. Other focus"
 )
+
+recoded_vars <- append(recoded_vars, "priority_state")
+recoded_vars <- append(recoded_vars, "priority_state_bin")
+recoded_vars <- append(recoded_vars, "focus_states")
 ```
 
 ```{r}
 df$Northeast_focus <- ifelse(df$focus_states == "1. NE Focus", 1, 0)  %>% as.factor()
 df$Other_Focus <- ifelse(df$focus_states == "2. Other focus", 1, 0)  %>% as.factor()
-```
 
+recoded_vars <- append(recoded_vars, "Northeast_focus")
+recoded_vars <- append(recoded_vars, "Other_Focus")
+```
 
 
 capture drop water_home
@@ -2104,6 +2291,8 @@ df <- df %>%
 
 # label values
 df$water_home <- factor(df$water_home, levels = c(0, 1), labels = c("0.no", "1.yes"))
+
+recoded_vars <- append(recoded_vars, "water_home")
 ```
 
 capture drop floor_finish
@@ -2125,6 +2314,8 @@ df$floor_finish <- case_when(
 )
 
 levels(df$floor_finish) <- c("0.no", "1.yes")
+
+recoded_vars <- append(recoded_vars, "floor_finish")
 ```
 
 capture drop wall_finish
@@ -2146,6 +2337,8 @@ df <- df %>%
     hv214 < 31 ~ 0,
     TRUE ~ NA_real_)) %>%
   mutate(wall_finish = factor(wall_finish, levels = c(0, 1), labels = c("0.no", "1.yes")))
+
+recoded_vars <- append(recoded_vars, "wall_finish")
 ```
 
 
@@ -2166,6 +2359,8 @@ df <- df %>%
     TRUE ~ 0
   )) %>%
   mutate(roof_finish = factor(roof_finish, levels = c(0, 1), labels = c("0.no", "1.yes")))
+
+recoded_vars <- append(recoded_vars, "roof_finish")
 ```
 
 capture drop house_finish
@@ -2190,6 +2385,12 @@ df <- df %>%
       house_finish == 2 ~ 1,
       TRUE ~ house_finish)
   )
+
+# Create label for 'house_finish' variable
+df$house_finish <- factor(df$house_finish, levels = c(0, 1, 2),
+                          labels = c("0. no concrete material", "1. some concrete material", "2. all concrete"))
+
+recoded_vars <- append(recoded_vars, "house_finish")
 ```
 
 capture drop use_soap
@@ -2215,30 +2416,12 @@ if ("use_soap" %in% names(df)) {
 # df$use_soap <- case_when(is.na(df$use_soap)  ~ 1,
 #                          TRUE ~ 0) %>% as.factor()
 
+df$use_soap <- NA
 df$use_soap[df$hv230a < 3] <- 0
 df$use_soap[df$hv232 == 1] <- 1
 df$use_soap <- df$use_soap %>% as.factor()
-```
 
-capture drop cooking_fuel
-gen cooking_fuel = . 
-replace cooking_fuel = 1 if fuel_type == 1
-replace cooking_fuel = 0 if fuel_type == 2 | fuel_type == 3
-label define cooking_fuel 0 "0. solid fuel" 1 "1. non-solid fuel"
-label value cooking_fuel cooking_fuel
-```{r}
-# remove cooking_fuel if it exists
-if ("cooking_fuel" %in% names(df)) {
-  df <- df %>% select(-cooking_fuel)
-}
-
-df$cooking_fuel <- case_when(
-  df$fuel_type == "1. electricity/gas/kerosene" ~ 1,
-  df$fuel_type == "2. wood/coal" | df$fuel_type == "3. straw/hay/dung" ~ 0,
-  TRUE ~ NA_real_
-)
-
-levels(df$cooking_fuel) <- c("0. solid fuel", "1. non-solid fuel")
+recoded_vars <- append(recoded_vars, "use_soap")
 ```
 
 capture drop reading
@@ -2276,6 +2459,8 @@ if ("christian" %in% names(df)) {
 
 df$christian <- ifelse(df$religion == 3, 1, 0)
 df$christian <- as.factor(df$christian)
+
+recoded_vars <- append(recoded_vars, "christian")
 ```
 
 capture drop low_caste
@@ -2293,22 +2478,14 @@ if ("low_caste" %in% names(df)) {
 # Replace values based on conditions
 df <- df %>% dplyr::mutate(low_caste = ifelse(caste == "1. None", 0,1) %>% as.factor())
 df$low_caste <- df$low_caste %>% as.factor()
-```
 
-
-
-```{r}
 # df <- df %>% dplyr::mutate(caste = case_when(df$caste == `1. None` ~ 4, 
 #                                        `2. Other backward caste` ~ 3, 
 #                                        `3. Scheduled Tribe` ~ 2,  
 #                                        `4. Scheduled Caste` 1))
 
+recoded_vars <- append(recoded_vars, "low_caste")
 ```
-
-
-
-
-
 
 
 capture drop toilet
@@ -2330,8 +2507,9 @@ df$toilet[df$toilet_type == "0. no toilet" ] <- 0
 df$toilet[df$toilet_type == "1. flush toilet" | df$toilet_type ==  "2. pit or dry toilet"] <- 1
 
 df$toilet <- as.factor(df$toilet)
-```
 
+recoded_vars <- append(recoded_vars, "toilet")
+```
 
 
 gen m_height = round(maternal_height_cm,1)
@@ -2343,7 +2521,10 @@ df <- df %>% mutate(m_height = round(maternal_height_cm, 1))
 
 # Create 'm_ht152' variable
 df <- df %>% mutate(m_ht152 = if_else(m_height >= 152 & !is.na(m_height), 1, 0))
+
+recoded_vars <- append(recoded_vars, "m_height")
 ```
+
 
 capture drop iron_3mo
 recode preg_iron (0 1 2 = 0 "0. no")(3 4 = 1 "1. yes"),gen(iron_3mo)
@@ -2360,7 +2541,10 @@ df <- df %>% mutate(iron_3mo = case_when(
   preg_iron %in% c("3. 3-6 mo", "4. 6+ mo") ~ "1. yes",
   TRUE ~ NA_character_ # all other cases
 ))
+
+recoded_vars <- append(recoded_vars, "iron_3mo")
 ```
+
 
 gen maternal_education = mother_education
 replace maternal_education = 3 if mother_education == 4
@@ -2371,7 +2555,14 @@ df <- df %>% mutate(maternal_education = mother_education)
 
 # Replace 'maternal_education' value with 3 if 'mother_education' equals 4
 df <- df %>% mutate(maternal_education = if_else(mother_education == 4, 3, maternal_education))
+
+# Create label for 'maternal_education' variable
+df$maternal_education <- factor(df$maternal_education, levels = c(0, 1, 2, 3),
+                                labels = c("no edu", "primary", "secondary", "high secondary or college"))
+
+recoded_vars <- append(recoded_vars, "maternal_education")
 ```
+
 
 capture drop anc_4visits
 recode anc_visits (0 1 = 0 "0. no")(2 = 1 "1. yes"),gen(anc_4visits)
@@ -2389,7 +2580,9 @@ df <- df %>% mutate(anc_4visits = case_when(
   TRUE ~ NA_character_ # all other cases
 ))
 
+recoded_vars <- append(recoded_vars, "anc_4visits")
 ```
+
 
 capture drop m_ht
 gen m_ht = . 
@@ -2417,6 +2610,8 @@ df$m_ht <- ifelse(df$maternal_height_cm >= 157.5 & !is.na(df$maternal_height_cm)
 labels <- c("1. 5feet2 or higher", "2. 4feet8 to 5feet2", "3. less than 4feet8")
 levels <- c(1, 2, 3)
 df$m_ht <- factor(df$m_ht, levels = levels, labels = labels)
+
+recoded_vars <- append(recoded_vars, "m_ht")
 ```
 
 
@@ -2429,26 +2624,21 @@ label value maternal_education maternal_education
 ```{r}
 num_siblings = c("3. 3", "4. 4 or more")
 
-
 # Create 'sibs' variable
 df <- df %>% mutate(sibs = case_when(
   siblings %in% num_siblings  ~ 1,
   TRUE ~ 0 # all other cases
 ))
 
-# Create label for 'house_finish' variable
-df$house_finish <- factor(df$house_finish, levels = c(0, 1, 2),
-                          labels = c("0. no concrete material", "1. some concrete material", "2. all concrete"))
-
-# Create label for 'maternal_education' variable
-df$maternal_education <- factor(df$maternal_education, levels = c(0, 1, 2, 3),
-                                labels = c("no edu", "primary", "secondary", "high secondary or college"))
+recoded_vars <- append(recoded_vars, "sibs")
 ```
+
 
 ```{r}
 df$house_partially_finished_no <- ifelse(df$house_finish != "1. some concrete material", 1, 0)  %>% as.factor()
-```
 
+recoded_vars <- append(recoded_vars, "house_partially_finished_no")
+```
 
 
 capture drop mother_agecat
@@ -2467,6 +2657,8 @@ df <- df %>% mutate(mother_agecat = case_when(
   v013 %in% c(5, 6, 7) ~ "3. 35+",
   TRUE ~ NA_character_ # all other cases
 ))
+
+recoded_vars <- append(recoded_vars, "mother_agecat")
 ```
 
 
@@ -2475,7 +2667,6 @@ gen scale_ciaf1_house = .
 replace scale_ciaf1_house = 0 if house_finish == 2
 replace scale_ciaf1_house = 3 if house_finish == 1
 replace scale_ciaf1_house = 4.5 if house_finish == 0
-
 
 ```{r}
 # Drop scale_ciaf1_house column if it exists
@@ -2491,7 +2682,9 @@ df$scale_ciaf1_house <- ifelse(df$house_finish == "2. all concrete", 0,
                                ifelse(df$house_finish == "1. some concrete material", 3,
                                       ifelse(df$house_finish == "0. no concrete material", 4.5, df$scale_ciaf1_house)))
 
+recoded_vars <- append(recoded_vars, "scale_ciaf1_house")
 ```
+
 
 capture drop scale_ciaf1_mheight
 gen scale_ciaf1_mheight = . 
@@ -2512,7 +2705,10 @@ df$scale_ciaf1_mheight <- NA
 df$scale_ciaf1_mheight <- ifelse(df$m_ht == "1. 5feet2 or higher", 0,
                                  ifelse(df$m_ht == "2. 4feet8 to 5feet2", 4,
                                         ifelse(df$m_ht == "3. less than 4feet8", 8, df$scale_ciaf1_mheight)))
+
+recoded_vars <- append(recoded_vars, "scale_ciaf1_mheight")
 ```
+
 
 capture drop scale_ciaf1_medu
 gen scale_ciaf1_medu = .
@@ -2535,13 +2731,15 @@ df$scale_ciaf1_medu <- ifelse(df$maternal_education == "high secondary or colleg
                               ifelse(df$maternal_education == "secondary", 2,
                                      ifelse(df$maternal_education == "primary", 3.5,
                                             ifelse(df$maternal_education == "no edu", 5, df$scale_ciaf1_medu))))
+
+recoded_vars <- append(recoded_vars, "scale_ciaf1_medu")
 ```
+
 
 capture drop scale_ciaf1_toilet
 gen scale_ciaf1_toilet = . 
 replace scale_ciaf1_toilet = 0 if toilet == 1
 replace scale_ciaf1_toilet = 3 if toilet == 0 
-
 
 ```{r}
 # Drop scale_ciaf1_medu column if it exists
@@ -2552,7 +2750,10 @@ if("scale_ciaf1_toilet" %in% names(df)) {
 # Create 'scale_ciaf1_toilet' column based on 'toilet' values
 df$scale_ciaf1_toilet <- ifelse(df$toilet == 1, 0,
                                  ifelse(df$toilet == 0, 3, NA))
+
+recoded_vars <- append(recoded_vars, "scale_ciaf1_toilet")
 ```
+
 
 capture drop scale_ciaf1_zone
 gen scale_ciaf1_zone = . 
@@ -2560,7 +2761,6 @@ replace scale_ciaf1_zone = 0 if state_zones == 1
 replace scale_ciaf1_zone = 2.5 if state_zones == 2 | state_zones == 3
 replace scale_ciaf1_zone = 2 if state_zones == 4 | state_zones == 6
 replace scale_ciaf1_zone = 5 if state_zones == 5
-
 
 ```{r}
 # Drop scale_ciaf1_zone column if it exists
@@ -2576,7 +2776,10 @@ df$scale_ciaf1_zone <- ifelse(df$state_zones == "1. North-Eastern", 0,
                               ifelse(df$state_zones %in% c("2. North", "3. Central"), 2.5,
                                      ifelse(df$state_zones %in% c("4. Eastern", "6. Southern"), 2,
                                             ifelse(df$state_zones == "5. Western", 5, df$scale_ciaf1_zone))))
+
+recoded_vars <- append(recoded_vars, "scale_ciaf1_zone")
 ```
+
 
 capture drop scale_ciaf1_fuel
 gen scale_ciaf1_fuel = 0 if cooking_fuel == 1
@@ -2594,13 +2797,15 @@ df$scale_ciaf1_fuel <- 0
 # Assign values to scale_ciaf1_fuel based on cooking_fuel
 df$scale_ciaf1_fuel <- ifelse(df$cooking_fuel == 1, 0,
                               ifelse(df$cooking_fuel == 0, 0.5, df$scale_ciaf1_fuel))
+
+recoded_vars <- append(recoded_vars, "scale_ciaf1_fuel")
 ```
+
 
 capture drop scale_ciaf1_female
 gen scale_ciaf1_female = .
 replace scale_ciaf1_female = 0 if female == 1 
 replace scale_ciaf1_female = 1 if female == 0
-
 
 ```{r}
 # Drop scale_ciaf1_female column if it exists
@@ -2614,7 +2819,10 @@ df$scale_ciaf1_female <- NA
 # Assign values to scale_ciaf1_female based on female
 df$scale_ciaf1_female <- ifelse(df$female == "1. female", 0,
                                 ifelse(df$female == "0. male", 1, df$scale_ciaf1_female))
+
+recoded_vars <- append(recoded_vars, "scale_ciaf1_female")
 ```
+
 
 capture drop scale_ciaf1_caste
 gen scale_ciaf1_caste = . 
@@ -2633,7 +2841,10 @@ df$scale_ciaf1_caste <- NA
 # Assign values to scale_ciaf1_caste based on low_caste
 df$scale_ciaf1_caste <- ifelse(df$low_caste == 0, 0,
                                ifelse(df$low_caste == 1, 2.5, df$scale_ciaf1_caste))
+
+recoded_vars <- append(recoded_vars, "scale_ciaf1_caste")
 ```
+
 
 capture drop scale_ciaf1_priority
 gen scale_ciaf1_priority = . 
@@ -2652,15 +2863,15 @@ df$scale_ciaf1_priority <- NA
 # Assign values to scale_ciaf1_priority based on priority_state
 df$scale_ciaf1_priority <- ifelse(df$priority_state == 0, 0,
                                   ifelse(df$priority_state == 1, 1, df$scale_ciaf1_priority))
+
+recoded_vars <- append(recoded_vars, "scale_ciaf1_priority")
 ```
+
 
 capture drop score_ciaf1
 egen score_ciaf1 = rowtotal(scale_ciaf1*)
 
 ```{r}
-# Assuming your data is in a data frame named 'df'
-# Replace 'df' with the name of your data frame
-
 # Drop score_ciaf1 column if it exists
 if("score_ciaf1" %in% names(df)) {
   df$score_ciaf1 <- NULL
@@ -2668,7 +2879,10 @@ if("score_ciaf1" %in% names(df)) {
 
 # Create score_ciaf1 column by summing up the scale_ciaf1* columns
 df$score_ciaf1 <- rowSums(df[grep("scale_ciaf1", names(df))], na.rm = TRUE)
+
+recoded_vars <- append(recoded_vars, "score_ciaf1")
 ```
+
 
 capture dist_ciaf_mean
 by shdistri, sort : egen float dist_ciaf_mean = mean(ciaf)
@@ -2679,7 +2893,7 @@ capture drop ciaf_decile
 recode dist_ciaf_decile (0.2 .3 = 1 "< 30%")(0.4 = 2 "40%") (0.5 = 3 "50%")(0.6 = 4 "60%")(0.7 = 5 "70%")(0.8 = 6 "80%"),
 
 ```{r}
-# shdistri was renamed to shdist
+# shdistri was renamed to shdist in the latest DHS
 
 # Calculate mean CIAF by shdist and sort
 df <- df %>% group_by(shdist) %>% arrange(shdist) %>% 
@@ -2707,6 +2921,11 @@ if("ciaf_decile" %in% names(df)) {
 df$ciaf_decile <- cut(df$dist_ciaf_decile, 
                       breaks = c(-Inf, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, Inf), 
                       labels = c("< 30%", "40%", "50%", "60%", "70%", "80%", "> 80%"))
+
+recoded_vars <- append(recoded_vars, "dist_ciaf_mean")
+recoded_vars <- append(recoded_vars, "mean_ciaf_dist")
+recoded_vars <- append(recoded_vars, "dist_ciaf_decile")
+recoded_vars <- append(recoded_vars, "ciaf_decile")
 ```
 
 ```{r}
@@ -2716,7 +2935,15 @@ df$mean_district_CIAF_60_69.9 <- ifelse(df$ciaf_decile == "60%", 1, 0)  %>% as.f
 df$mean_district_CIAF_70_79.9 <- ifelse(df$ciaf_decile == "70%", 1, 0) %>% as.factor()
 df$mean_district_CIAF_80_89.9 <- ifelse(df$ciaf_decile == "80%", 1, 0) %>% as.factor()
 
-# Convert to factor
+recoded_vars <- append(recoded_vars, "mean_district_CIAF_40_49.9")
+recoded_vars <- append(recoded_vars, "mean_district_CIAF_50_59.9")
+recoded_vars <- append(recoded_vars, "mean_district_CIAF_60_69.9")
+recoded_vars <- append(recoded_vars, "mean_district_CIAF_70_79.9")
+recoded_vars <- append(recoded_vars, "mean_district_CIAF_80_89.9")
+```
+
+```{r}
+# Convert CIAF to factor after using is as numeric before
 df$ciaf <- as.factor(df$ciaf)
 ```
 
@@ -2757,8 +2984,10 @@ df$wasted_decile <- cut(df$dist_wasted_decile,
                         labels = c("0-10%", "10-20%", "20-30%", "30-40%", "40-50%", "50-60%"),
                         right = FALSE)
 
+recoded_vars <- append(recoded_vars, "mean_wasted_dist")
+recoded_vars <- append(recoded_vars, "dist_wasted_decile")
+recoded_vars <- append(recoded_vars, "wasted_decile")
 ```
-
 
 
 capture drop priority_district 
@@ -2768,6 +2997,8 @@ replace dist_priority = 0 if dist_priority != 9999
 replace dist_priority = 1 if dist_priority == 9999
 
 ```{r}
+# This is not being added for some reason....
+
 if ('priority_district' %in% colnames(df)) {
   df$priority_district <- NULL
 }
@@ -2801,8 +3032,13 @@ rev(colnames(df))
 ```
 
 ```{r}
-path <- "/Users/justi/OneDrive/Desktop/colabo_data/data/"
-#path <- "data/DHS-2019-21/"
-dffile <- "recoded.rda"
-save(df, file = here(path, dffile)) 
+# Save recoded data as R object
+dffile <- here(data_folder, "recoded.rda") 
+save(df, file=dffile)
+```
+
+```{r}
+# Save list of recoded variables
+rvfile <- here(data_folder, "recoded-variables.txt")
+write.table(recoded_vars, rvfile, row.names=FALSE, col.names=FALSE)
 ```
