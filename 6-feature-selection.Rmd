@@ -8,16 +8,13 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-library(missForest)
-library(missMDA)
 library(magrittr)
 library(here) 
-library(e1071)
 library(glmnet)
-library(xgboost)
 library(dplyr)
 library(caret)
 library(pROC)
+library(properties)
 ```
 
 ```{r}
@@ -38,7 +35,7 @@ df
 
 ```{r}
 # Convert 'ciaf' to a factor (assuming binary classification)
-df$ciaf <- as.factor(df$ciaf)
+#df$ciaf <- as.factor(df$ciaf)
 
 # Separate the response variable and predictors
 response <- df$ciaf
@@ -85,11 +82,6 @@ predictors <- predictors %>% select(-all_of(redundant_vars))
 predictors
 ```
 
-
-```{r}
-```
-
-
 ```{r}
 # Split the data into selection, training, and testing sets (34% selection, 33% training, 33% testing)
 
@@ -135,179 +127,33 @@ print(selected_features)
 writeLines(selected_features, here(mdl_folder1, "sel_predictor_names.txt"))
 ```
 
-
-
-
-
-
-
-
-
-
-
-
 ```{r}
-# Apply the same scaling to the training and test predictors using the parameters from the selection set
-#train_predictors <- scale(train_predictors, center = attr(sel_predictors, "scaled:center"), scale = attr(sel_predictors, "scaled:scale"))
-#test_predictors <- scale(test_predictors, center = attr(train_predictors, "scaled:center"), scale = attr(train_predictors, "scaled:scale"))
-
-# need best_lambda
-
-# Use the selected features to create new training and testing sets
+# Use the selected features to create training sets
 selected_train_predictors <- train_predictors[, selected_features]
-selected_test_predictors <- test_predictors[, selected_features]
 
 # Fit logistic regression model using only the selected features on the training set
-final_lasso_model <- glmnet(selected_train_predictors, train_response, alpha = 1, lambda = best_lambda, family = "binomial")
+train_model <- glmnet(selected_train_predictors, train_response, alpha = 1, lambda = best_lambda, family = "binomial")
 ```
 
 ```{r}
-# Make predictions on the test set
-test_predictions <- predict(final_lasso_model, newx = selected_test_predictors, type = "response")
+coef_matrix <- coef(train_model)
+print(coef_matrix)
+      
+# Convert the dgCMatrix to a dataframe
+coef_df <- as.data.frame(as.matrix(coef_matrix))
 
-# Calculate AUC-ROC on the test set
-test_auc <- roc(test_response, test_predictions)$auc
-print(paste("AUC-ROC on test set:", test_auc))
+# Add row names as a column
+coef_df <- cbind(Variable = rownames(coef_df), coef_df)
 
-# Convert predictions to binary classes (0 or 1) using a threshold of 0.5
-test_pred_class <- ifelse(test_predictions > 0.5, 1, 0)
+# Rename the coefficient column for clarity
+colnames(coef_df)[2] <- "Coefficient"
 
-# Create confusion matrices for test sets
-test_conf_matrix <- confusionMatrix(factor(test_pred_class), test_response, positive = "1")
-
-# Print confusion matrices
-print(test_conf_matrix)
-
-roc_test <- roc(test_response, test_predictions)
-
-#Plot ROC curve for test data
-plot(roc_test, main = paste0("Lasso ROC Curve for Test Data: AUC = ", round(test_auc, digits = 3)))
+write.csv(coef_df, here(mdl_folder1, "new_model_coeff.csv"), row.names=FALSE)
 ```
-
-
-
-
-
-
-
 
 ```{r}
-# Create initial split: 60% training and 40% remaining
-trainIndex <- createDataPartition(df$ciaf, p = 0.6, list = FALSE)
-trainData <- df[trainIndex,] %>% select(c(selected_features, "ciaf"))
-remainingData <- df[-trainIndex,] %>% select(c(selected_features, "ciaf"))
-
-# Split remaining data into 50% validation and 50% testing
-validationIndex <- createDataPartition(remainingData$ciaf, p = 0.5, list = FALSE)
-validationData <- remainingData[validationIndex,] %>% select(c(selected_features, "ciaf"))
-testData <- remainingData[-validationIndex,] %>% select(c(selected_features, "ciaf"))
-
-# Train the model
-naive_bayes_model <- naiveBayes(ciaf ~ ., data = trainData)
-
-# Make predictions on the validation data
-validationPredictions <- predict(naive_bayes_model, validationData)
-validationProbabilities <- predict(naive_bayes_model, validationData, type = "raw")[,2]
-
-# Evaluate the model on validation data
-validationResults <- confusionMatrix(validationPredictions, validationData$ciaf, positive = "1")
-print(validationResults)
-
-# Calculate AUC for validation data
-roc_validation <- roc(validationData$ciaf, validationProbabilities)
-auc_validation <- auc(roc_validation)
-print(paste("AUC for Validation Data:", auc_validation))
-
-# Make predictions on the test data
-testPredictions <- predict(naive_bayes_model, testData)
-testProbabilities <- predict(naive_bayes_model, testData, type = "raw")[,2]
-
-# Evaluate the model on test data
-testResults <- confusionMatrix(testPredictions, testData$ciaf, positive = "1")
-print(testResults)
-
-# Calculate AUC for test data
-roc_test <- roc(testData$ciaf, testProbabilities)
-auc_test <- auc(roc_test)
-print(paste("AUC for Test Data:", auc_test))
-
-# Plot ROC curve for test data
-plot(roc_test, main = paste0("Naive Bayes ROC Curve for Test Data: AUC = ", round(auc_test,
-                                                                      digits = 2)))
-
-# Plot ROC curve for validation data
-plot(roc_validation, main = paste0("Naive Bayes ROC Curve for Validation Data: AUC = ", round(auc_validation,
-                                                                      digits = 2)))
-
+# Save model object and test data for testing in the next step
+save(train_model, file=here(mdl_folder1, "train_model.rda"))
+save(test_predictors, file=here(mdl_folder1, "test_predictors.rda"))
+save(test_response, file=here(mdl_folder1, "test_response.rda"))
 ```
-
-
-
-
-```{r}
-# Ensure the target variable is a factor
-df$ciaf <- as.factor(df$ciaf)
-
-# Split the data into training and testing sets
-set.seed(123) # For reproducibility
-trainIndex <- createDataPartition(df$ciaf, p = .8, 
-                                  list = FALSE, 
-                                  times = 1)
-train_data <- df[trainIndex, ]
-test_data <- df[-trainIndex, ]
-
-# Prepare the data for XGBoost
-train_matrix <- xgb.DMatrix(data = as.matrix(train_data[, -which(names(train_data) == "ciaf")]), 
-                            label = as.numeric(train_data$ciaf) - 1) # XGBoost requires 0-based indexing for labels
-test_matrix <- xgb.DMatrix(data = as.matrix(test_data[, -which(names(test_data) == "ciaf")]), 
-                           label = as.numeric(test_data$ciaf) - 1)
-
-# Set up the parameters for the XGBoost model
-params <- list(
-  booster = "gbtree",
-  objective = "binary:logistic", # Use "multi:softprob" for multi-class classification
-  eval_metric = "logloss", # Use appropriate metric for your problem
-  eta = 0.1,
-  max_depth = 6,
-  subsample = 0.8,
-  colsample_bytree = 0.8
-)
-
-# Train the model
-set.seed(123) # For reproducibility
-xgb_model <- xgb.train(
-  params = params,
-  data = train_matrix,
-  nrounds = 100, # Number of boosting rounds
-  watchlist = list(train = train_matrix, test = test_matrix),
-  early_stopping_rounds = 10, # Stop if no improvement after 10 rounds
-  verbose = 1
-)
-
-# Make predictions
-pred_probs <- predict(xgb_model, test_matrix)
-pred_labels <- ifelse(pred_probs > 0.5, 1, 0)
-
-# Convert predictions back to original factor levels
-pred_labels <- factor(pred_labels, levels = levels(test_data$ciaf))
-
-# Evaluate the model using confusion matrix
-confusion_matrix <- confusionMatrix(pred_labels, test_data$ciaf, positive = "1")
-print(confusion_matrix)
-
-# Calculate AUC
-library(pROC)
-roc_obj <- roc(test_data$ciaf, pred_probs)
-auc_value <- auc(roc_obj)
-print(paste("AUC:", auc_value))
-
-# Plot ROC curve for test data
-plot(roc_obj, main = paste0("xgBoost ROC Curve for Test Data: AUC = ", round(auc_value,
-                                                                      digits = 2)))
-
-```
-
-
-
-
-

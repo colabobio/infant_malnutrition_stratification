@@ -23,6 +23,7 @@ library(pROC)
 library(ggplot2)
 library(properties)
 library(ResourceSelection)
+library(CalibrationCurves)
 ```
 
 ```{r message=FALSE, cache=F}
