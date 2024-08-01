@@ -157,3 +157,16 @@ save(train_model, file=here(mdl_folder1, "train_model.rda"))
 save(test_predictors, file=here(mdl_folder1, "test_predictors.rda"))
 save(test_response, file=here(mdl_folder1, "test_response.rda"))
 ```
+
+```{r}
+# Save data as csv to use in Python
+df_train_predictors <- as.data.frame(selected_train_predictors)
+df_train_response <- as.data.frame(train_response)
+write.csv(df_train_predictors, file=here(mdl_folder1, "train_predictors.csv"), row.names = FALSE)
+write.csv(df_train_response, file=here(mdl_folder1, "train_response.csv"), row.names = FALSE)
+
+df_test_predictors <- as.data.frame(selected_test_predictors)
+df_test_response <- as.data.frame(test_response)
+write.csv(df_test_predictors, file=here(mdl_folder1, "test_predictors.csv"), row.names = FALSE)
+write.csv(df_test_response, file=here(mdl_folder1, "test_response.csv"), row.names = FALSE)
+```
