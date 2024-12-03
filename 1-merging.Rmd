@@ -14,7 +14,7 @@ library(tidyselect) # used to select variables in FP_EVENTS.R
 library(haven)      # used for Haven labeled DHSvariables
 library(labelled)   # used for Haven labeled variable creation
 library(expss)      # for creating tables with Haven labeled data
-library(xlsx)       # for exporting to excel
+library(xlsx)      # for exporting to excel
 library(naniar)     # to use replace_with_na function
 library(here)       # to get R project path
 library(sjlabelled) # to set variables label

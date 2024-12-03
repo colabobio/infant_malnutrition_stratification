@@ -1061,12 +1061,26 @@ recoded_vars <- append(recoded_vars, "dietary_diversity_score")
 xtile dd_quintile = dietary_diversity_score if child_age > = 6 & elig == 1, nq(4)
 
 ```{r}
-df  <- df %>%
-  filter(child_age >= 6, elig == 1) %>% # Filter the df
-  mutate(dd_quintile = ntile(dietary_diversity_score, 4)) %>% # Create the quintiles
-  ungroup()
+# Assuming dietary_diversity_score, child_age, and elig are vectors in a data frame named 'df'
 
-recoded_vars <- append(recoded_vars, "dd_quintile")
+df <- df %>%
+  mutate(dd_quintile = ifelse(child_age >= 6 & elig == 1,
+                              {
+                                # Calculate unique quantile breaks
+                                quantiles <- unique(quantile(dietary_diversity_score[child_age >= 6 & elig == 1],
+                                                             probs = seq(0, 1, by = 0.25), na.rm = TRUE))
+                                
+                                # Check if there are enough unique breaks to create the bins
+                                if (length(quantiles) > 1) {
+                                  as.numeric(cut(dietary_diversity_score,
+                                                 breaks = quantiles,
+                                                 include.lowest = TRUE))
+                                } else {
+                                  NA
+                                }
+                              },
+                              NA))
+
 ```
 
 capture drop bf_start
