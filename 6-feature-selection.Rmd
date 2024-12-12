@@ -29,7 +29,7 @@ dir.create(mdl_folder1)
 ```{r}
 dffile <- here(data_folder, "imputed.rda")
 load(file=dffile)
-df <- dfi
+df <- dfi %>% dplyr::select(-c("elig"))
 df
 ```
 
@@ -39,7 +39,7 @@ df
 
 # Separate the response variable and predictors
 response <- df$ciaf
-predictors <- df %>% select(-ciaf)
+predictors <- df %>% dplyr::select(-ciaf)
 
 # Ensure all predictors are numeric
 predictors <- predictors %>% mutate(across(everything(), as.numeric))
@@ -78,7 +78,7 @@ redundant_vars
 
 ```{r}
 # Removing redundant predictors
-predictors <- predictors %>% select(-all_of(redundant_vars))
+predictors <- predictors %>% dplyr::select(-any_of(redundant_vars))
 predictors
 ```
 
@@ -137,7 +137,10 @@ train_model <- glmnet(selected_train_predictors, train_response, alpha = 1, lamb
 
 ```{r}
 coef_matrix <- coef(train_model)
+
 print(coef_matrix)
+
+
       
 # Convert the dgCMatrix to a dataframe
 coef_df <- as.data.frame(as.matrix(coef_matrix))
@@ -150,6 +153,26 @@ colnames(coef_df)[2] <- "Coefficient"
 
 write.csv(coef_df, here(mdl_folder1, "new_model_coeff.csv"), row.names=FALSE)
 ```
+
+
+```{r}
+# Convert to a numeric vector
+coef_vector <- as.vector(coef_matrix)
+
+# Get the names of non-zero coefficients (excluding the intercept)
+selected <- rownames(coef_matrix)[coef_vector != 0][-1]  # Remove intercept
+
+train_model_selected <- selected_train_predictors[, selected]
+
+# Refit with glm
+glm_fit <- glm(train_response ~ train_model_selected, family = "binomial")
+
+# Get confidence intervals
+confidence_intervals = confint(glm_fit)
+
+write.csv(confidence_intervals, here(mdl_folder1, "new_confidence_intervals.csv"), row.names=TRUE)
+```
+
 
 ```{r}
 # Save model object and test data for testing in the next step

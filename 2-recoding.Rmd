@@ -560,7 +560,8 @@ df <- df %>%
 
 df <- df %>%
   mutate(maternal_height_4feet8inches_to_less_5feetinches = ifelse(df$maternal_height_cm > 142.24  & df$maternal_height_cm < 152.4, 1, 0) %>% as.factor(),
-         maternal_height_less_4feet8inches = ifelse(df$maternal_height_cm < 142.24, 1, 0) %>% as.factor())
+         maternal_height_less_4feet8inches = ifelse(df$maternal_height_cm < 142.24, 1, 0) %>% as.factor(),
+         maternal_height_5_2_feet_taller_inches = ifelse(df$maternal_height_cm > 152.4, 1, 0) %>% as.factor())
 
 recoded_vars <- append(recoded_vars, "maternal_height_4feet8inches_to_less_5feetinches")
 ```
@@ -1508,6 +1509,7 @@ df = df %>%
   mutate(num_siblings_two_or_more = ifelse(df$siblings_bin == "2. 2 or more", 1, 0)  %>% 
            as.factor())
 
+
 recoded_vars <- append(recoded_vars, "num_siblings_two_or_more")
 ```
 
@@ -1835,10 +1837,12 @@ if ("birth_weight_1800_g_2500_g" %in% names(df)) {
 
 df <- df %>%
   mutate(birth_weight_less_than_1800_g = ifelse(df$birthweight == "1. 1800g or less", 1, 0)  %>% as.factor(),
-         birth_weight_1800_g_2500_g = ifelse(df$birthweight == "2. 1801 to 2500g", 1, 0) %>% as.factor())
+         birth_weight_1800_g_2500_g = ifelse(df$birthweight == "2. 1801 to 2500g", 1, 0) %>% as.factor(),
+         birth_weight_more_than_2500_g = ifelse(df$birthweight == "3. more than 2500g", 1, 0) %>% as.factor())
 
 recoded_vars <- append(recoded_vars, "birth_weight_less_than_1800_g")
 recoded_vars <- append(recoded_vars, "birth_weight_1800_g_2500_g")
+recoded_vars <- append(recoded_vars, "birth_weight_more_than_2500_g")
 ```
 
 
@@ -1975,6 +1979,8 @@ df <- df %>%
          maternal_edu_1_7 = ifelse(df$v133 >= 1 & df$v133 <= 7,
                               1, 0) %>% as.factor(),
          maternal_edu_greater_7_10 = ifelse(df$v133 >= 7 & df$v133 <= 10,
+                              1, 0) %>% as.factor(),
+         maternal_edu_greater_10 = ifelse(df$v133 > 10,
                               1, 0) %>% as.factor())
 
 recoded_vars <- append(recoded_vars, "maternal_edu_no")
@@ -3006,44 +3012,67 @@ recoded_vars <- append(recoded_vars, "wasted_decile")
 
 capture drop priority_district 
 capture drop dist_priority
-recode sdistri (300 301 305 313 317 318 204  205 206 209 210 211 212 214 236 238 401 402 406 416 417 351 352 353 356 358 359 362 366 367 368 369 424 425 426 427 428 429 431 441 446 453 454 460 461 462 463 464 465 389 390 391 394 396 397 398 399 106 107 114 115 116 121 123 124 125 130 149 150 151 152 153 154 155 174 176 177 180 181 182 183 186 200 201 202 59 61 68 543 544 551 552 245 247 249 252 255 256 258 90 92 468 469 472 484 485 487 489 491 75 77 80 87 89 23 25 27 34 3 5 6 16 17 18 556 557 559 560 561 565 579 580 588 592 593 272 273 274 280 293 295 296 299 281 286 287 288 634 35 39 44 47 54 242 605 606 614 623 628 631 291 329 330 332 333 343 261 262 267 269 270 271 532 538 511 523 499 498 497 508 514 515 512 279 625 184 = 9999) , gen(dist_priority)
+recode shdist (300 301 305 313 317 318 204  205 206 209 210 211 212 214 236 238 401 402 406 416 417 351 352 353 356 358 359 362 366 367 368 369 424 425 426 427 428 429 431 441 446 453 454 460 461 462 463 464 465 389 390 391 394 396 397 398 399 106 107 114 115 116 121 123 124 125 130 149 150 151 152 153 154 155 174 176 177 180 181 182 183 186 200 201 202 59 61 68 543 544 551 552 245 247 249 252 255 256 258 90 92 468 469 472 484 485 487 489 491 75 77 80 87 89 23 25 27 34 3 5 6 16 17 18 556 557 559 560 561 565 579 580 588 592 593 272 273 274 280 293 295 296 299 281 286 287 288 634 35 39 44 47 54 242 605 606 614 623 628 631 291 329 330 332 333 343 261 262 267 269 270 271 532 538 511 523 499 498 497 508 514 515 512 279 625 184 = 9999) , gen(dist_priority)
 replace dist_priority = 0 if dist_priority != 9999
 replace dist_priority = 1 if dist_priority == 9999
 
 ```{r}
-# This is not being added for some reason....
+# Create or modify the 'dist_priority' variable
+df <- df %>%
+  mutate(
+    dist_priority = if_else(
+      shdist %in% c(
+        300, 301, 305, 313, 317, 318, 204, 205, 206, 209, 210, 211, 212, 214, 236, 238,
+        401, 402, 406, 416, 417, 351, 352, 353, 356, 358, 359, 362, 366, 367, 368, 369,
+        424, 425, 426, 427, 428, 429, 431, 441, 446, 453, 454, 460, 461, 462, 463, 464,
+        465, 389, 390, 391, 394, 396, 397, 398, 399, 106, 107, 114, 115, 116, 121, 123,
+        124, 125, 130, 149, 150, 151, 152, 153, 154, 155, 174, 176, 177, 180, 181, 182,
+        183, 186, 200, 201, 202, 59, 61, 68, 543, 544, 551, 552, 245, 247, 249, 252,
+        255, 256, 258, 90, 92, 468, 469, 472, 484, 485, 487, 489, 491, 75, 77, 80, 87,
+        89, 23, 25, 27, 34, 3, 5, 6, 16, 17, 18, 556, 557, 559, 560, 561, 565, 579, 580,
+        588, 592, 593, 272, 273, 274, 280, 293, 295, 296, 299, 281, 286, 287, 288, 634,
+        35, 39, 44, 47, 54, 242, 605, 606, 614, 623, 628, 631, 291, 329, 330, 332, 333,
+        343, 261, 262, 267, 269, 270, 271, 532, 538, 511, 523, 499, 498, 497, 508, 514,
+        515, 512, 279, 625, 184
+      ),
+      1,  # Assign 1 for matching values
+      0   # Assign 0 for non-matching values
+    )
+  )
 
-if ('priority_district' %in% colnames(df)) {
-  df$priority_district <- NULL
-}
-
-#df <- df %>% 
-#  mutate(dist_priority = case_when(sdistri %in% c(300, 301, 305, 313, 317, 318, 204, 205, 206, 209, 210, 211, 212, 214, 236, 238, 401, 402, 406, 416, 417, 351, 352, 353, 356, 358, 359, 362, 366, 367, 368, 369, 424, 425, 426, 427, 428, 429, 431, 441, 446, 453, 454, 460, 461, 462, 463, 464, 465, 389, 390, 391, 394, 396, 397, 398, 399, 106, 107, 114, 115, 116, 121, 123, 124, 125, 130, 149, 150, 151, 152, 153, 154, 155, 174, 176, 177, 180, 181, 182, 183, 186, 200, 201, 202, 59, 61, 68, 543, 544, 551, 552, 245, 247, 249, 252, 255, 256, 258, 90, 92, 468, 469, 472, 484, 485, 487, 489, 491, 75, 77, 80, 87, 89, 23, 25, 27, 34, 3, 5, 6, 16, 17, 18, 556, 557, 559, 560, 561, 565, 579, 580, 588, 592, 593, 272, 273, 274, 280, 293, 295, 296, 299, 281, 286, 287, 288, 634, 35, 39, 44, 47, 54, 242, 605, 606, 614, 623, 628, 631, 291, 329, 330, 332, 333, 343, 261, 262, 267, 269, 270, 271, 532, 538, 511, 523, 499, 498, 497, 508, 514, 515, 512, 279, 625, 184), TRUE ~ 9999, TRUE ~ NA_real_)) %>% 
-#  mutate(dist_priority = if_else(dist_priority != 9999, 0, 1))
-
-                           
-
-# To mimic the 'capture drop' behavior in R, you can use the following lines of code
-#if ('priority_district' %in% colnames(df)) {
-#  df$priority_district <- NULL
-#}
-#if ('dist_priority' %in% colnames(df)) {
-#  df$dist_priority <- NULL
-#}
-
-# Create a new column 'dist_priority' based on the values in the 'sdistri' column
-#df$dist_priority <- ifelse(df$sdistri %in% c(300, 301, 305, 313, 317, 318, 204, 205, 206, 209, 210, 211, 212, 214, 236, 238, 401, 402, 406, 416, 417, 351, 352, 353, 356, 358, #359, 362, 366, 367, 368, 369, 424, 425, 426, 427, 428, 429, 431, 441, 446, 453, 454, 460, 461, 462, 463, 464, 465, 389, 390, 391, 394, 396, 397, 398, 399, 106, 107, 114, 115, #116, 121, 123, 124, 125, 130, 149, 150, 151, 152, 153, 154, 155, 174, 176, 177, 180, 181, 182, 183, 186, 200, 201, 202, 59, 61, 68, 543, 544, 551, 552, 245, 247, 249, 252, #255, 256, 258, 90, 92, 468, 469, 472, 484, 485, 487, 489, 491, 75, 77, 80, 87, 89, 23, 25, 27, 34, 3, 5, 6, 16, 17, 18, 556, 557, 559, 560, 561, 565, 579, 580, 588, 592, 593, #272, 273, 274, 280, 293, 295, 296, 299, 281, 286, 287, 288, 634, 35, 39, 44, 47, 54, 242, 605, 606, 614, 623, 628, 631, 291, 329, 330, 332, 333, 343, 261, 262, 267, 269, 270, #271, 532, 538, 511, 523, 499, 498, 497, 508, 514, 515, 512, 279, 625, 184), 9999, 0)
-
-# Update 'dist_priority' values
-#df$dist_priority[df$dist_priority != 9999] <- 0
-#df$dist_priority[df$dist_priority == 9999] <- 1
 
 ```
+
 
 
 ```{r}
 rev(colnames(df))
 ```
+
+
+## Exclusion/Inclusion Criteria 
+```{r}
+
+df <- df %>% dplyr::filter(child_age < 60)
+
+print(paste0("Filter only children under the age of 5 (60 months): ", nrow(df)))
+
+df <- df %>% dplyr::filter(defacto_child == 1)
+
+print(paste0("Children that are part of the household: ", nrow(df)))
+
+df <- df %>% dplyr::filter(child_alive == 1)
+
+print(paste0("Children that are alive: ", nrow(df)))
+
+df <- df %>% dplyr::filter(!is.na(ciaf))
+
+print(paste0("Children with complete anthropometric information: ", nrow(df)))
+
+```
+
+
+
 
 ```{r}
 # Save recoded data as R object

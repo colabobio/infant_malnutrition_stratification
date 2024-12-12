@@ -1,0 +1,194 @@
+---
+title: "3.5 - Validation (with Imputation)"
+author: "Justin Guerra"
+date: "2024-12-04"
+output: html_document
+---
+
+From Stata to R
+https://fsolt.org/blog/posts/switch-to-r/
+https://epi-stats.github.io/Rtutorials/Stata_to_R#recode
+https://www.techtips.surveydesign.com.au/post/the-recode-command
+
+
+```{r setup, include=FALSE}
+library(Hmisc)
+library(rms)
+library(glmnet)
+library(dplyr)
+library(imputeTS)
+library(mice)
+library(ROCit)
+library(pROC)
+library(ggplot2)
+library(properties)
+library(ResourceSelection)
+library(CalibrationCurves)
+```
+
+```{r message=FALSE, cache=F}
+source('./mdl-evaluation.R')
+```
+
+```{r}
+prop <- read.properties("data.properties")
+data_folder <- prop$data_folder
+output_folder <- prop$output_folder
+```
+
+```{r}
+dffile <- here(data_folder, "recoded.rda")
+load(file=dffile)
+```
+
+```{r}
+# Function to impute missing values by sampling from the empirical distribution of each column
+impute_missing_values <- function(df) {
+  # Apply a function across all columns using dplyr's mutate_all
+  df %>% mutate_all(function(column) {
+    if(any(is.na(column))) {  # Check if there are any NA values in the column
+      # Non-missing values
+      non_missing <- na.omit(column)
+      # Sample from non-missing values to replace NA values
+      # Sample size equals the number of missing values
+      column[is.na(column)] <- sample(non_missing, sum(is.na(column)), replace = TRUE)
+    }
+    return(column)
+  })
+}
+```
+
+```{r}
+model_vars <- c("maternal_height_4feet8inches_to_less_5feetinches",
+                "maternal_height_less_4feet8inches",
+                "maternal_edu_no",
+                "maternal_edu_1_7",
+                "maternal_edu_greater_7_10",
+                "sex_male",
+                "pre_birth_interval_less_than_equal_to_24_months",
+                "birth_weight_less_than_1800_g",
+                "birth_weight_1800_g_2500_g",
+                "num_siblings_two_or_more",
+                "low_caste",
+                "toliet_access_no",
+                "house_partially_finished_no",
+                "separate_kitchen_no",
+                "cooking_fuel_solid",
+                "use_soap",
+                "Northeast_focus",
+                "Other_Focus",
+                "mean_district_CIAF_40_49.9",
+                "mean_district_CIAF_50_59.9",
+                "mean_district_CIAF_60_69.9",
+                "mean_district_CIAF_70_79.9",
+                "mean_district_CIAF_80_89.9",
+                "ciaf")
+
+model_coeffs <- c(intercept = -1.62,  
+                  maternal_height_4feet8inches_to_less_5feetinches = 0.34, 
+                  maternal_height_less_4feet8inches = 0.79,
+                  maternal_edu_no = 0.45,
+                  maternal_edu_1_7 = 0.30,
+                  maternal_edu_greater_7_10 = 0.17,
+                  sex_male = 0.10,
+                  pre_birth_interval_less_than_equal_to_24_months = 0.23,
+                  birth_weight_less_than_1800_g = 0.88,
+                  birth_weight_1800_g_2500_g = 0.46,
+                  birth_weight_1800_g_2500_g = 0.46,
+                  num_siblings_two_or_more = 0.07,
+                  low_caste = 0.14,
+                  toliet_access_no = 0.18,
+                  house_partially_finished_no = 0.12,
+                  separate_kitchen_no = 0.07,
+                  cooking_fuel_solid = 0.07,
+                  use_soap = 0.07,
+                  Northeast_focus = -0.16,
+                  Other_Focus = -0.23,
+                  mean_district_CIAF_40_49.9 = 0.29,
+                  mean_district_CIAF_50_59.9 = 0.60,
+                  mean_district_CIAF_60_69.9 = 0.87,
+                  mean_district_CIAF_70_79.9 = 1.11,
+                  mean_district_CIAF_80_89.9 = 1.64)
+
+df_model <- df[, model_vars] 
+
+# mice_imputed_df = mice(df_model,
+#                      method = c("logreg"),
+#                      seed = 123, maxit = 5) %>% 
+#   complete(., action = 5)
+
+
+df_model_nona <- df_model  %>% impute_missing_values %>% 
+  dplyr::mutate_if(is.factor, as.character) %>% #Change from factor to character (some reason converting 0s and 1s to 1s and 2s)
+  dplyr::mutate_if(is.character, as.integer) #Change from character to integer
+
+```
+
+```{r}
+# Function to calculate the predicted the log odds (linear term of the model)
+calc_log_odds <- function(coefficients, data) {
+  # Extract the intercept from the coefficients
+  intercept <- coefficients[1]
+  
+  # Extract the predictor variables from the coefficients
+  predictors <- coefficients[-1]
+  
+  # Calculate the linear predictor using the coefficients and predictor values
+  linear_predictor <- intercept + rowSums(predictors * data)
+  
+  return(linear_predictor)
+}
+
+# Function to calculate the predicted probabilities given the log odds
+calc_pred_probs <- function(log_odds) {
+  # Apply the logistic link function to get the predicted probabilities
+  probabilities <- 1 / (1 + exp(-log_odds))
+  return(probabilities)
+}
+```
+
+```{r}
+data0 <- df_model_nona
+pred0 <- calc_log_odds(model_coeffs, data0)
+prob0 <- calc_pred_probs(pred0)
+```
+
+```{r}
+mdl_folder0 <- here(output_folder,"orig-model-validation-imputation")
+dir.create(mdl_folder0)
+
+# Generate the data frame with the data needed for the calibration and ROC plots
+plot_data0 <- data.frame(out = data0$ciaf, logodds = pred0, prob = prob0)
+
+cal_plot(base_model, plot_data0, "prob", model_label = '', dir = mdl_folder0, fn = "cal_plot_imputed.pdf")
+cal_c0 <- cal_coeff(plot_data0, "prob", mdl_folder0, "cal_plot_coefficients_imputed.txt")
+print(cal_c0)
+
+roc_plot(data0$ciaf, prob0, dir = mdl_folder0, fn = "roc_plot_imputed.pdf")
+```
+
+```{r}
+plot_roc_perf(plot_data0$out, plot_data0$prob)
+```
+
+```{r}
+conf_matrix(plot_data0$out, plot_data0$prob, 0.5, mdl_folder0, "conf_matrix.txt")
+```
+
+```{r}
+# Hosmer-Lemeshow goodness of fit table for distribution of observed CIAF prevalence vs predicted prevalence
+hosmerlem <- hoslem_test <- hoslem.test(data0$ciaf, prob0, g=10)
+hl_table <- data.frame(
+  Observed = hoslem_test$observed,
+  Expected = hoslem_test$expected,
+  Observed_Positive = hoslem_test$observed[,2],
+  Expected_Positive = hoslem_test$expected[,2]
+)
+hosmerlem
+print(hl_table)
+```
+
+```{r}
+hl_file <- here(mdl_folder0, "hl_table.csv")
+write.csv(hl_table, hl_file, row.names=FALSE)
+```

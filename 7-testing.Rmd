@@ -70,19 +70,26 @@ conf_matrix(test_data$out, test_data$prob, 0.5, mdl_folder1, "conf_matrix.txt")
 ```
 
 ```{r}
-# Hosmer-Lemeshow goodness of fit table for distribution of observed CIAF prevalence vs predicted prevalence
-hosmerlem <- hoslem_test <- hoslem.test(test_response, test_probs, g=10)
+# Assuming 'test_response' is the binary outcome variable for CIAF and 'test_probs' are the predicted probabilities
+hosmerlem <- hoslem.test(test_response, test_probs, g=10)
+
+# Create the data frame with observed and expected CIAF values for each group
 hl_table <- data.frame(
-  Observed = hoslem_test$observed,
-  Expected = hoslem_test$expected,
-  Observed_Positive = hoslem_test$observed[,2],
-  Expected_Positive = hoslem_test$expected[,2]
+  Group = 1:10,  # Group numbers for each decile
+  Observed = hosmerlem$observed[,2],  # Observed CIAF positive cases in each group
+  Expected = hosmerlem$expected[,2],  # Expected CIAF positive cases in each group
+  Observed_Positive = hosmerlem$observed[,2],  # Observed CIAF positive cases
+  Expected_Positive = hosmerlem$expected[,2]   # Expected CIAF positive cases
 )
-hosmerlem
+
+# Calculate percentages for observed and expected CIAF prevalence
+hl_table$Observed_Percentage = (hl_table$Observed_Positive / sum(hl_table$Observed_Positive)) * 100
+hl_table$Expected_Percentage = (hl_table$Expected_Positive / sum(hl_table$Expected_Positive)) * 100
+
 print(hl_table)
 ```
 ```{r}
-hl_file <- here(mdl_folder1, "hl_table.csv")
+hl_file <- here(mdl_folder1, "hl_table_newmodel.csv")
 write.csv(hl_table, hl_file, row.names=FALSE)
 ```
 

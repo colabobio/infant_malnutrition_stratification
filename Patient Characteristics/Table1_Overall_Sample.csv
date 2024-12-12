@@ -1,0 +1,81 @@
+,Column,Value,Frequency,Percentage
+1,Northeast_focus,0,147371,74.25%
+2,Northeast_focus,1,51110,25.75%
+3,Other_Focus,0,82910,41.77%
+4,Other_Focus,1,115571,58.23%
+5,birth_weight_1800_g_2500_g,0,120101,60.51%
+6,birth_weight_1800_g_2500_g,1,59726,30.09%
+7,birth_weight_1800_g_2500_g,NA,18654,9.40%
+8,birth_weight_less_than_1800_g,0,174477,87.91%
+9,birth_weight_less_than_1800_g,1,5350,2.70%
+10,birth_weight_less_than_1800_g,NA,18654,9.40%
+11,birth_weight_more_than_2500_g,0,65076,32.79%
+12,birth_weight_more_than_2500_g,1,114751,57.81%
+13,birth_weight_more_than_2500_g,NA,18654,9.40%
+14,ciaf,0,95910,48.32%
+15,ciaf,1,102571,51.68%
+16,cooking_fuel,0. solid fuel,108823,54.83%
+17,cooking_fuel,1. non-solid fuel,89449,45.07%
+18,cooking_fuel,NA,209,0.11%
+19,dist_priority,0,143956,72.53%
+20,dist_priority,1,54525,27.47%
+21,focus_states,0. Normal Focus,31800,16.02%
+22,focus_states,1. NE Focus,51110,25.75%
+23,focus_states,2. Other focus,115571,58.23%
+24,house_partially_finished_no,0,106617,53.72%
+25,house_partially_finished_no,1,91864,46.28%
+26,low_caste,0,41084,20.70%
+27,low_caste,1,156302,78.75%
+28,low_caste,NA,1095,0.55%
+29,maternal_edu_1_7,0,158616,79.91%
+30,maternal_edu_1_7,1,39865,20.09%
+31,maternal_edu_greater_10,0,144498,72.80%
+32,maternal_edu_greater_10,1,53983,27.20%
+33,maternal_edu_greater_7_10,0,127118,64.05%
+34,maternal_edu_greater_7_10,1,71363,35.95%
+35,maternal_edu_no,0,155557,78.37%
+36,maternal_edu_no,1,42924,21.63%
+37,maternal_height_4feet8inches_to_less_5feetinches,0,100064,50.41%
+38,maternal_height_4feet8inches_to_less_5feetinches,1,97525,49.14%
+39,maternal_height_4feet8inches_to_less_5feetinches,NA,892,0.45%
+40,maternal_height_5_2_feet_taller_inches,0,109503,55.17%
+41,maternal_height_5_2_feet_taller_inches,1,88086,44.38%
+42,maternal_height_5_2_feet_taller_inches,NA,892,0.45%
+43,maternal_height_less_4feet8inches,0,187496,94.47%
+44,maternal_height_less_4feet8inches,1,10093,5.09%
+45,maternal_height_less_4feet8inches,NA,892,0.45%
+46,mean_district_CIAF_40_49.9,0,157116,79.16%
+47,mean_district_CIAF_40_49.9,1,41365,20.84%
+48,mean_district_CIAF_50_59.9,0,136592,68.82%
+49,mean_district_CIAF_50_59.9,1,61889,31.18%
+50,mean_district_CIAF_60_69.9,0,132994,67.01%
+51,mean_district_CIAF_60_69.9,1,65487,32.99%
+52,mean_district_CIAF_70_79.9,0,182257,91.83%
+53,mean_district_CIAF_70_79.9,1,16224,8.17%
+54,mean_district_CIAF_80_89.9,0,197167,99.34%
+55,mean_district_CIAF_80_89.9,1,1314,0.66%
+56,num_siblings_two_or_more,0,132738,66.88%
+57,num_siblings_two_or_more,1,49683,25.03%
+58,num_siblings_two_or_more,NA,16060,8.09%
+59,pre_birth_interval,1. 24+ or first child,90680,45.69%
+60,pre_birth_interval,2. < 24 months,31733,15.99%
+61,pre_birth_interval,NA,76068,38.33%
+62,pre_birth_interval_less_than_equal_to_24_months,0,90680,45.69%
+63,pre_birth_interval_less_than_equal_to_24_months,1,31733,15.99%
+64,pre_birth_interval_less_than_equal_to_24_months,NA,76068,38.33%
+65,rural,0. urban,39820,20.06%
+66,rural,1. rural,158661,79.94%
+67,separate_kitchen_no,0,147153,74.14%
+68,separate_kitchen_no,1,51120,25.76%
+69,separate_kitchen_no,NA,208,0.10%
+70,sex_male,0,96433,48.59%
+71,sex_male,1,102048,51.41%
+72,siblings_bin,1. 0 or 1,132738,66.88%
+73,siblings_bin,2. 2 or more,49683,25.03%
+74,siblings_bin,NA,16060,8.09%
+75,toliet_access_no,0,155236,78.21%
+76,toliet_access_no,1,43244,21.79%
+77,toliet_access_no,NA,1,0.00%
+78,use_soap,0,52384,26.39%
+79,use_soap,1,139559,70.31%
+80,use_soap,NA,6538,3.29%

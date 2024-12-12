@@ -1,0 +1,81 @@
+Column	Value	Frequency	Percentage
+Northeast_focus	0	147371	74.25%
+Northeast_focus	1	51110	25.75%
+Other_Focus	0	82910	41.77%
+Other_Focus	1	115571	58.23%
+birth_weight_1800_g_2500_g	0	120101	60.51%
+birth_weight_1800_g_2500_g	1	59726	30.09%
+birth_weight_1800_g_2500_g	NA	18654	9.40%
+birth_weight_less_than_1800_g	0	174477	87.91%
+birth_weight_less_than_1800_g	1	5350	2.70%
+birth_weight_less_than_1800_g	NA	18654	9.40%
+birth_weight_more_than_2500_g	0	65076	32.79%
+birth_weight_more_than_2500_g	1	114751	57.81%
+birth_weight_more_than_2500_g	NA	18654	9.40%
+ciaf	0	95910	48.32%
+ciaf	1	102571	51.68%
+cooking_fuel	0. solid fuel	108823	54.83%
+cooking_fuel	1. non-solid fuel	89449	45.07%
+cooking_fuel	NA	209	0.11%
+dist_priority	0	143956	72.53%
+dist_priority	1	54525	27.47%
+focus_states	0. Normal Focus	31800	16.02%
+focus_states	1. NE Focus	51110	25.75%
+focus_states	2. Other focus	115571	58.23%
+house_partially_finished_no	0	106617	53.72%
+house_partially_finished_no	1	91864	46.28%
+low_caste	0	41084	20.70%
+low_caste	1	156302	78.75%
+low_caste	NA	1095	0.55%
+maternal_edu_1_7	0	158616	79.91%
+maternal_edu_1_7	1	39865	20.09%
+maternal_edu_greater_10	0	144498	72.80%
+maternal_edu_greater_10	1	53983	27.20%
+maternal_edu_greater_7_10	0	127118	64.05%
+maternal_edu_greater_7_10	1	71363	35.95%
+maternal_edu_no	0	155557	78.37%
+maternal_edu_no	1	42924	21.63%
+maternal_height_4feet8inches_to_less_5feetinches	0	100064	50.41%
+maternal_height_4feet8inches_to_less_5feetinches	1	97525	49.14%
+maternal_height_4feet8inches_to_less_5feetinches	NA	892	0.45%
+maternal_height_5_2_feet_taller_inches	0	109503	55.17%
+maternal_height_5_2_feet_taller_inches	1	88086	44.38%
+maternal_height_5_2_feet_taller_inches	NA	892	0.45%
+maternal_height_less_4feet8inches	0	187496	94.47%
+maternal_height_less_4feet8inches	1	10093	5.09%
+maternal_height_less_4feet8inches	NA	892	0.45%
+mean_district_CIAF_40_49.9	0	157116	79.16%
+mean_district_CIAF_40_49.9	1	41365	20.84%
+mean_district_CIAF_50_59.9	0	136592	68.82%
+mean_district_CIAF_50_59.9	1	61889	31.18%
+mean_district_CIAF_60_69.9	0	132994	67.01%
+mean_district_CIAF_60_69.9	1	65487	32.99%
+mean_district_CIAF_70_79.9	0	182257	91.83%
+mean_district_CIAF_70_79.9	1	16224	8.17%
+mean_district_CIAF_80_89.9	0	197167	99.34%
+mean_district_CIAF_80_89.9	1	1314	0.66%
+num_siblings_two_or_more	0	132738	66.88%
+num_siblings_two_or_more	1	49683	25.03%
+num_siblings_two_or_more	NA	16060	8.09%
+pre_birth_interval	1. 24+ or first child	90680	45.69%
+pre_birth_interval	2. < 24 months	31733	15.99%
+pre_birth_interval	NA	76068	38.33%
+pre_birth_interval_less_than_equal_to_24_months	0	90680	45.69%
+pre_birth_interval_less_than_equal_to_24_months	1	31733	15.99%
+pre_birth_interval_less_than_equal_to_24_months	NA	76068	38.33%
+rural	0. urban	39820	20.06%
+rural	1. rural	158661	79.94%
+separate_kitchen_no	0	147153	74.14%
+separate_kitchen_no	1	51120	25.76%
+separate_kitchen_no	NA	208	0.10%
+sex_male	0	96433	48.59%
+sex_male	1	102048	51.41%
+siblings_bin	1. 0 or 1	132738	66.88%
+siblings_bin	2. 2 or more	49683	25.03%
+siblings_bin	NA	16060	8.09%
+toliet_access_no	0	155236	78.21%
+toliet_access_no	1	43244	21.79%
+toliet_access_no	NA	1	0.00%
+use_soap	0	52384	26.39%
+use_soap	1	139559	70.31%
+use_soap	NA	6538	3.29%

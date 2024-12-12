@@ -98,7 +98,26 @@ for (col in recoded_vars) {
 ```
 
 ```{r}
-dfr <- df[recoded_vars]
+dfr <- df %>% dplyr::select(-c("maternal_height_4feet8inches_to_less_5feetinches",
+                "maternal_height_less_4feet8inches",
+                "maternal_edu_no",
+                "maternal_edu_1_7",
+                "maternal_edu_greater_7_10",
+                "sex_male",
+                "pre_birth_interval_less_than_equal_to_24_months",
+                "birth_weight_less_than_1800_g",
+                "birth_weight_1800_g_2500_g",
+                "birth_weight_more_than_2500_g",
+                "num_siblings_two_or_more",
+                "low_caste",
+                "toliet_access_no",
+                "house_partially_finished_no",
+                "separate_kitchen_no",
+                "cooking_fuel_solid",
+                "Northeast_focus",
+                "Other_Focus")) %>%
+  dplyr::select(any_of(recoded_vars))
+
 dfr
 ```
 
@@ -222,10 +241,10 @@ other_ciaf_vars <- c("dist_ciaf_mean",
                      "stunt_waste")
 
 # Remove the columns from dfr
-dfr <- dfr %>% select(-all_of(unk_vars))
+dfr <- dfr %>% select(-any_of(unk_vars))
 dfr <- dfr %>% select(-all_of(measure_vars))
 dfr <- dfr %>% select(-all_of(redundant_vars))
-dfr <- dfr %>% select(-all_of(geo_vars))
+dfr <- dfr %>% select(-any_of(geo_vars))
 dfr <- dfr %>% select(-all_of(ciaf_scale_vars))
 dfr <- dfr %>% select(-all_of(other_ciaf_vars))
 ```
@@ -259,11 +278,11 @@ for (var in factor_variables) {
 ```
 
 ```{r}
-dfr <- dfr %>% filter(eligch == 1, defacto_child == 1)
+# dfr <- dfr %>% filter(eligch == 1, defacto_child == 1)
 ```
 
 ```{r}
-dfr <- dfr %>% select(-all_of(c("eligch", "defacto_child")))
+dfr <- dfr %>% select(-any_of(c("eligch", "defacto_child")))
 dfr
 ```
 
